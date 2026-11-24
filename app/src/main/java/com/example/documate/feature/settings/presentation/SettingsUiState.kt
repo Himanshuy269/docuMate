@@ -14,5 +14,15 @@ data class SettingsUiState(
     val defaultPageSize: PdfPageSize = PdfPageSize.A4,
     val defaultCompression: CompressionPreset = CompressionPreset.MEDIUM,
     val backendServiceUrl: String = "http://10.0.2.2:8080",
-    val isSavedSuccessMessageVisible: Boolean = false
-)
+    val cacheSizeBytes: Long = 0L,
+    val isSavedSuccessMessageVisible: Boolean = false,
+    val isConfirmClearCacheVisible: Boolean = false,
+    val statusMessage: String? = null
+) {
+    val formattedCacheSize: String
+        get() = when {
+            cacheSizeBytes <= 0 -> "0 KB"
+            cacheSizeBytes < 1024 * 1024 -> String.format("%.1f KB", cacheSizeBytes / 1024.0)
+            else -> String.format("%.2f MB", cacheSizeBytes / (1024.0 * 1024.0))
+        }
+}

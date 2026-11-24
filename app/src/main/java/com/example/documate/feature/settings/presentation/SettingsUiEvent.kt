@@ -8,4 +8,8 @@ sealed interface SettingsUiEvent {
     data class SelectDefaultPageSize(val size: PdfPageSize) : SettingsUiEvent
     data class SelectDefaultCompression(val preset: CompressionPreset) : SettingsUiEvent
     data class UpdateBackendUrl(val url: String) : SettingsUiEvent
+    data object ShowClearCacheConfirmation : SettingsUiEvent
+    data object DismissClearCacheConfirmation : SettingsUiEvent
+    data object ClearAppCache : SettingsUiEvent
+    data object DismissStatusMessage : SettingsUiEvent
 }

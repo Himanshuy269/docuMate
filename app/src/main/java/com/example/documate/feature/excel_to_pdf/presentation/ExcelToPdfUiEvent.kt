@@ -8,6 +8,8 @@ sealed interface ExcelToPdfUiEvent {
     data class UpdateOutputFileName(val name: String) : ExcelToPdfUiEvent
     data object StartConversion : ExcelToPdfUiEvent
     data object CancelConversion : ExcelToPdfUiEvent
+    data class SavePdfToUri(val destinationUriString: String) : ExcelToPdfUiEvent
     data object ClearError : ExcelToPdfUiEvent
+    data object ClearSaveSuccess : ExcelToPdfUiEvent
     data object Reset : ExcelToPdfUiEvent
 }

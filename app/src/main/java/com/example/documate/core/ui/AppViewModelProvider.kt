@@ -30,7 +30,8 @@ object AppViewModelProvider {
             HistoryViewModel(app.container.historyRepository)
         }
         initializer {
-            SettingsViewModel()
+            val app = docuMateApplication()
+            SettingsViewModel(app.container.settingsRepository)
         }
         initializer {
             val app = docuMateApplication()
@@ -59,24 +60,21 @@ object AppViewModelProvider {
             val app = docuMateApplication()
             ExcelToPdfViewModel(
                 documentRepository = app.container.documentRepository,
-                officeConversionRepository = app.container.officeConversionRepository,
-                historyRepository = app.container.historyRepository
+                convertExcelToPdfUseCase = app.container.convertExcelToPdfUseCase
             )
         }
         initializer {
             val app = docuMateApplication()
             WordToPdfViewModel(
                 documentRepository = app.container.documentRepository,
-                officeConversionRepository = app.container.officeConversionRepository,
-                historyRepository = app.container.historyRepository
+                convertWordToPdfUseCase = app.container.convertWordToPdfUseCase
             )
         }
         initializer {
             val app = docuMateApplication()
             PowerPointToPdfViewModel(
                 documentRepository = app.container.documentRepository,
-                officeConversionRepository = app.container.officeConversionRepository,
-                historyRepository = app.container.historyRepository
+                convertPowerPointToPdfUseCase = app.container.convertPowerPointToPdfUseCase
             )
         }
     }

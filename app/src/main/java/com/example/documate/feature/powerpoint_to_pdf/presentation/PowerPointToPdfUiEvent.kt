@@ -8,6 +8,8 @@ sealed interface PowerPointToPdfUiEvent {
     data class UpdateOutputFileName(val name: String) : PowerPointToPdfUiEvent
     data object StartConversion : PowerPointToPdfUiEvent
     data object CancelConversion : PowerPointToPdfUiEvent
+    data class SavePdfToUri(val destinationUriString: String) : PowerPointToPdfUiEvent
     data object ClearError : PowerPointToPdfUiEvent
+    data object ClearSaveSuccess : PowerPointToPdfUiEvent
     data object Reset : PowerPointToPdfUiEvent
 }

@@ -11,6 +11,8 @@ data class WordToPdfUiState(
     val progress: Float = 0f,
     val statusMessage: String? = null,
     val resultFile: DocumentFile? = null,
+    val shareableUriString: String? = null,
+    val saveSuccessMessage: String? = null,
     val errorMessage: String? = null
 ) {
     val canConvert: Boolean

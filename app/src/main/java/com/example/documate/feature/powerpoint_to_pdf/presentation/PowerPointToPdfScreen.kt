@@ -59,10 +59,25 @@ fun PowerPointToPdfScreen(
         uri?.let { viewModel.onEvent(PowerPointToPdfUiEvent.SelectFile(it.toString())) }
     }
 
+    val saveDocLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        uri?.let {
+            viewModel.onEvent(PowerPointToPdfUiEvent.SavePdfToUri(it.toString()))
+        }
+    }
+
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { error ->
             snackbarHostState.showSnackbar(error)
             viewModel.onEvent(PowerPointToPdfUiEvent.ClearError)
+        }
+    }
+
+    LaunchedEffect(uiState.saveSuccessMessage) {
+        uiState.saveSuccessMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.onEvent(PowerPointToPdfUiEvent.ClearSaveSuccess)
         }
     }
 
@@ -100,19 +115,28 @@ fun PowerPointToPdfScreen(
                         resultFile = uiState.resultFile!!,
                         originalFileSizeBytes = uiState.selectedFile?.sizeBytes,
                         onPreview = {
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(Uri.parse(uiState.resultFile!!.uriString), "application/pdf")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Preview PDF"))
+                            try {
+                                val targetUri = Uri.parse(uiState.shareableUriString ?: uiState.resultFile!!.uriString)
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(targetUri, "application/pdf")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Preview PDF"))
+                            } catch (_: Exception) {}
                         },
                         onShare = {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "application/pdf"
-                                putExtra(Intent.EXTRA_STREAM, Uri.parse(uiState.resultFile!!.uriString))
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Share PDF"))
+                            try {
+                                val targetUri = Uri.parse(uiState.shareableUriString ?: uiState.resultFile!!.uriString)
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/pdf"
+                                    putExtra(Intent.EXTRA_STREAM, targetUri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Share PDF"))
+                            } catch (_: Exception) {}
+                        },
+                        onSaveToStorage = {
+                            saveDocLauncher.launch(uiState.resultFile!!.name)
                         },
                         onConvertAnother = { viewModel.onEvent(PowerPointToPdfUiEvent.Reset) }
                     )
@@ -161,7 +185,7 @@ fun PowerPointToPdfScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                listOf(1, 2, 4).forEach { count ->
+                                listOf(1, 2, 4, 6).forEach { count ->
                                     DocuFilterChip(
                                         selected = uiState.slidesPerPage == count,
                                         onClick = { viewModel.onEvent(PowerPointToPdfUiEvent.SelectSlidesPerPage(count)) },

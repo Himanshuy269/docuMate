@@ -3,12 +3,9 @@ package com.example.documate.feature.powerpoint_to_pdf.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.documate.core.common.AppResult
-import com.example.documate.core.domain.model.ConversionRecord
 import com.example.documate.core.domain.model.DocumentFile
-import com.example.documate.core.domain.model.DocumentTool
 import com.example.documate.core.domain.repository.DocumentRepository
-import com.example.documate.core.domain.repository.HistoryRepository
-import com.example.documate.core.domain.repository.OfficeConversionRepository
+import com.example.documate.feature.powerpoint_to_pdf.domain.usecase.ConvertPowerPointToPdfUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,12 +13,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
-import java.util.UUID
+import java.net.URI
 
 class PowerPointToPdfViewModel(
     private val documentRepository: DocumentRepository,
-    private val officeConversionRepository: OfficeConversionRepository,
-    private val historyRepository: HistoryRepository
+    private val convertPowerPointToPdfUseCase: ConvertPowerPointToPdfUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PowerPointToPdfUiState())
@@ -32,13 +28,15 @@ class PowerPointToPdfViewModel(
     fun onEvent(event: PowerPointToPdfUiEvent) {
         when (event) {
             is PowerPointToPdfUiEvent.SelectFile -> handleSelectFile(event.uriString)
-            is PowerPointToPdfUiEvent.RemoveFile -> _uiState.update { it.copy(selectedFile = null) }
+            is PowerPointToPdfUiEvent.RemoveFile -> _uiState.update { it.copy(selectedFile = null, outputFileName = "") }
             is PowerPointToPdfUiEvent.SetConsent -> _uiState.update { it.copy(hasConsentedToBackend = event.consented) }
             is PowerPointToPdfUiEvent.SelectSlidesPerPage -> _uiState.update { it.copy(slidesPerPage = event.count) }
             is PowerPointToPdfUiEvent.UpdateOutputFileName -> _uiState.update { it.copy(outputFileName = event.name) }
             is PowerPointToPdfUiEvent.StartConversion -> handleStartConversion()
             is PowerPointToPdfUiEvent.CancelConversion -> handleCancelConversion()
+            is PowerPointToPdfUiEvent.SavePdfToUri -> handleSavePdfToUri(event.destinationUriString)
             is PowerPointToPdfUiEvent.ClearError -> _uiState.update { it.copy(errorMessage = null) }
+            is PowerPointToPdfUiEvent.ClearSaveSuccess -> _uiState.update { it.copy(saveSuccessMessage = null) }
             is PowerPointToPdfUiEvent.Reset -> _uiState.update { PowerPointToPdfUiState() }
         }
     }
@@ -59,7 +57,7 @@ class PowerPointToPdfViewModel(
                     _uiState.update {
                         it.copy(
                             selectedFile = file,
-                            outputFileName = "${cleanBaseName}_presentation.pdf"
+                            outputFileName = "${cleanBaseName}_slides"
                         )
                     }
                 }
@@ -81,62 +79,42 @@ class PowerPointToPdfViewModel(
             _uiState.update {
                 it.copy(
                     isConverting = true,
-                    progress = 0.1f,
-                    statusMessage = "Caching presentation...",
+                    progress = 0.05f,
+                    statusMessage = "Caching PowerPoint presentation...",
                     errorMessage = null
                 )
             }
 
-            val cachedFile: File = when (val copyResult = documentRepository.copyToAppCache(file.uriString, file.name)) {
-                is AppResult.Success -> copyResult.data
-                is AppResult.Error -> {
-                    _uiState.update { it.copy(isConverting = false, errorMessage = copyResult.message) }
-                    return@launch
-                }
-                else -> return@launch
-            }
-
-            _uiState.update { it.copy(statusMessage = "Converting slides into PDF pages...", progress = 0.3f) }
-
-            val result = officeConversionRepository.convertOfficeDocumentToPdf(
-                sourceFile = cachedFile,
-                tool = DocumentTool.POWERPOINT_TO_PDF,
-                backendBaseUrl = "http://10.0.2.2:8080",
-                onProgress = { p ->
-                    _uiState.update { it.copy(progress = 0.3f + p * 0.65f) }
+            val result = convertPowerPointToPdfUseCase(
+                sourceFile = file,
+                hasConsentedToBackend = state.hasConsentedToBackend,
+                slidesPerPage = state.slidesPerPage,
+                outputFileName = state.outputFileName,
+                onProgress = { p, status ->
+                    _uiState.update { it.copy(progress = p, statusMessage = status) }
                 }
             )
 
             when (result) {
                 is AppResult.Success -> {
-                    val outputFile = result.data
-                    val resultDoc = DocumentFile(
-                        id = UUID.randomUUID().toString(),
-                        name = outputFile.name,
-                        uriString = outputFile.toURI().toString(),
-                        sizeBytes = outputFile.length(),
-                        mimeType = "application/pdf",
-                        extension = "pdf"
-                    )
-
-                    val record = ConversionRecord(
-                        id = UUID.randomUUID().toString(),
-                        tool = DocumentTool.POWERPOINT_TO_PDF,
-                        sourceFileName = file.name,
-                        outputFileName = outputFile.name,
-                        outputPath = outputFile.absolutePath,
-                        originalSizeBytes = file.sizeBytes,
-                        outputSizeBytes = outputFile.length(),
-                        timestampMillis = System.currentTimeMillis()
-                    )
-                    historyRepository.addRecord(record)
+                    val resultDoc = result.data
+                    val shareableUri = try {
+                        val outputFile = File(URI(resultDoc.uriString))
+                        when (val shareResult = documentRepository.getShareableUri(outputFile)) {
+                            is AppResult.Success -> shareResult.data
+                            else -> resultDoc.uriString
+                        }
+                    } catch (_: Exception) {
+                        resultDoc.uriString
+                    }
 
                     _uiState.update {
                         it.copy(
                             isConverting = false,
                             progress = 1.0f,
                             statusMessage = null,
-                            resultFile = resultDoc
+                            resultFile = resultDoc,
+                            shareableUriString = shareableUri
                         )
                     }
                 }
@@ -146,6 +124,26 @@ class PowerPointToPdfViewModel(
                     }
                 }
                 else -> {}
+            }
+        }
+    }
+
+    private fun handleSavePdfToUri(destinationUriString: String) {
+        val resultFile = _uiState.value.resultFile ?: return
+        viewModelScope.launch {
+            try {
+                val file = File(URI(resultFile.uriString))
+                when (val saveResult = documentRepository.copyFileToUri(file, destinationUriString)) {
+                    is AppResult.Success -> {
+                        _uiState.update { it.copy(saveSuccessMessage = "PowerPoint presentation saved as PDF successfully!") }
+                    }
+                    is AppResult.Error -> {
+                        _uiState.update { it.copy(errorMessage = "Failed to save PDF: ${saveResult.message}") }
+                    }
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Failed to save file: ${e.message}") }
             }
         }
     }

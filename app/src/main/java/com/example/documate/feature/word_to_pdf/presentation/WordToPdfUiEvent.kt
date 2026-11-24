@@ -8,6 +8,8 @@ sealed interface WordToPdfUiEvent {
     data class UpdateOutputFileName(val name: String) : WordToPdfUiEvent
     data object StartConversion : WordToPdfUiEvent
     data object CancelConversion : WordToPdfUiEvent
+    data class SavePdfToUri(val destinationUriString: String) : WordToPdfUiEvent
     data object ClearError : WordToPdfUiEvent
+    data object ClearSaveSuccess : WordToPdfUiEvent
     data object Reset : WordToPdfUiEvent
 }
