@@ -1,6 +1,9 @@
 package com.example.documate.core.di
 
 import android.content.Context
+import com.example.documate.core.data.repository.AndroidDocumentRepository
+import com.example.documate.core.data.repository.DefaultOfficeConversionRepository
+import com.example.documate.core.data.repository.DefaultPdfRepository
 import com.example.documate.core.domain.repository.DocumentRepository
 import com.example.documate.core.domain.repository.HistoryRepository
 import com.example.documate.core.domain.repository.OfficeConversionRepository
@@ -13,6 +16,9 @@ import com.example.documate.feature.history.data.InMemoryHistoryRepository
  */
 interface AppContainer {
     val historyRepository: HistoryRepository
+    val documentRepository: DocumentRepository
+    val pdfRepository: PdfRepository
+    val officeConversionRepository: OfficeConversionRepository
 }
 
 /**
@@ -21,5 +27,17 @@ interface AppContainer {
 class DefaultAppContainer(private val applicationContext: Context) : AppContainer {
     override val historyRepository: HistoryRepository by lazy {
         InMemoryHistoryRepository()
+    }
+
+    override val documentRepository: DocumentRepository by lazy {
+        AndroidDocumentRepository(applicationContext)
+    }
+
+    override val pdfRepository: PdfRepository by lazy {
+        DefaultPdfRepository(applicationContext)
+    }
+
+    override val officeConversionRepository: OfficeConversionRepository by lazy {
+        DefaultOfficeConversionRepository(applicationContext)
     }
 }

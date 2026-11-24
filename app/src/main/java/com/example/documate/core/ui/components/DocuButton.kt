@@ -101,3 +101,21 @@ fun DocuOutlinedButton(
         }
     }
 }
+
+@Composable
+fun DocuSecondaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    icon: ImageVector? = null
+) {
+    DocuOutlinedButton(
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        icon = icon
+    )
+}
+
