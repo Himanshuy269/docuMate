@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -29,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.documate.core.domain.model.PdfMargin
 import com.example.documate.core.domain.model.PdfOrientation
 import com.example.documate.core.domain.model.PdfPageSize
 import com.example.documate.core.ui.AppViewModelProvider
@@ -51,6 +54,7 @@ import com.example.documate.core.ui.components.DocuProgressCard
 import com.example.documate.core.ui.components.DocuResultCard
 import com.example.documate.core.ui.components.DocuSecondaryButton
 import com.example.documate.core.ui.components.DocuSectionHeader
+import com.example.documate.core.ui.components.DocuThumbnailImage
 import com.example.documate.core.ui.components.DocuTopAppBar
 
 @Composable
@@ -71,10 +75,25 @@ fun ImagesToPdfScreen(
         }
     }
 
+    val saveDocLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        uri?.let {
+            viewModel.onEvent(ImagesToPdfUiEvent.SavePdfToUri(it.toString()))
+        }
+    }
+
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { error ->
             snackbarHostState.showSnackbar(error)
             viewModel.onEvent(ImagesToPdfUiEvent.ClearError)
+        }
+    }
+
+    LaunchedEffect(uiState.saveSuccessMessage) {
+        uiState.saveSuccessMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.onEvent(ImagesToPdfUiEvent.ClearSaveSuccess)
         }
     }
 
@@ -114,19 +133,37 @@ fun ImagesToPdfScreen(
                         resultFile = uiState.resultFile!!,
                         originalFileSizeBytes = uiState.selectedImages.sumOf { it.sizeBytes },
                         onPreview = {
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(Uri.parse(uiState.resultFile!!.uriString), "application/pdf")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            try {
+                                val targetUri = Uri.parse(uiState.shareableUriString ?: uiState.resultFile!!.uriString)
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(targetUri, "application/pdf")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Preview PDF"))
+                            } catch (e: Exception) {
+                                // Fallback error handling
                             }
-                            context.startActivity(Intent.createChooser(intent, "Preview PDF"))
                         },
                         onShare = {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "application/pdf"
-                                putExtra(Intent.EXTRA_STREAM, Uri.parse(uiState.resultFile!!.uriString))
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            try {
+                                val targetUri = Uri.parse(uiState.shareableUriString ?: uiState.resultFile!!.uriString)
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/pdf"
+                                    putExtra(Intent.EXTRA_STREAM, targetUri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Share PDF"))
+                            } catch (e: Exception) {
+                                // Fallback error handling
                             }
-                            context.startActivity(Intent.createChooser(intent, "Share PDF"))
+                        },
+                        onSaveToStorage = {
+                            val cleanName = if (uiState.outputFileName.endsWith(".pdf", ignoreCase = true)) {
+                                uiState.outputFileName
+                            } else {
+                                "${uiState.outputFileName}.pdf"
+                            }
+                            saveDocLauncher.launch(cleanName)
                         },
                         onConvertAnother = { viewModel.onEvent(ImagesToPdfUiEvent.Reset) }
                     )
@@ -138,7 +175,7 @@ fun ImagesToPdfScreen(
                         DocuCard(modifier = Modifier.fillMaxWidth()) {
                             DocuEmptyState(
                                 title = "No Images Selected",
-                                description = "Select images from your device to combine them into a single PDF document.",
+                                description = "Select multiple images from your device. You can reorder, preview, configure page size, orientation, and margins before converting.",
                                 icon = Icons.Default.AddPhotoAlternate
                             )
                         }
@@ -158,12 +195,26 @@ fun ImagesToPdfScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             DocuSectionHeader(title = "Selected Images (${uiState.selectedImages.size})")
-                            DocuSecondaryButton(
-                                text = "Add More",
-                                onClick = { imagePickerLauncher.launch("image/*") },
-                                icon = Icons.Default.AddPhotoAlternate,
-                                modifier = Modifier.width(130.dp)
-                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    onClick = { viewModel.onEvent(ImagesToPdfUiEvent.ClearAllImages) }
+                                ) {
+                                    Text(
+                                        text = "Clear All",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                                DocuSecondaryButton(
+                                    text = "Add More",
+                                    onClick = { imagePickerLauncher.launch("image/*") },
+                                    icon = Icons.Default.AddPhotoAlternate,
+                                    modifier = Modifier.width(125.dp)
+                                )
+                            }
                         }
                     }
 
@@ -176,8 +227,15 @@ fun ImagesToPdfScreen(
                                 Text(
                                     text = "${index + 1}.",
                                     style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(horizontal = 6.dp)
+                                    modifier = Modifier.padding(start = 4.dp, end = 8.dp)
                                 )
+
+                                DocuThumbnailImage(
+                                    uriString = image.uriString,
+                                    size = 54.dp,
+                                    modifier = Modifier.padding(end = 12.dp)
+                                )
+
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = image.name,
@@ -194,25 +252,37 @@ fun ImagesToPdfScreen(
 
                                 IconButton(
                                     onClick = { viewModel.onEvent(ImagesToPdfUiEvent.MoveImage(index, index - 1)) },
-                                    enabled = index > 0
+                                    enabled = index > 0,
+                                    modifier = Modifier.size(36.dp)
                                 ) {
-                                    Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up")
+                                    Icon(
+                                        Icons.Default.ArrowUpward,
+                                        contentDescription = "Move Up",
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
 
                                 IconButton(
                                     onClick = { viewModel.onEvent(ImagesToPdfUiEvent.MoveImage(index, index + 1)) },
-                                    enabled = index < uiState.selectedImages.size - 1
+                                    enabled = index < uiState.selectedImages.size - 1,
+                                    modifier = Modifier.size(36.dp)
                                 ) {
-                                    Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down")
+                                    Icon(
+                                        Icons.Default.ArrowDownward,
+                                        contentDescription = "Move Down",
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
 
                                 IconButton(
-                                    onClick = { viewModel.onEvent(ImagesToPdfUiEvent.RemoveImage(index)) }
+                                    onClick = { viewModel.onEvent(ImagesToPdfUiEvent.RemoveImage(index)) },
+                                    modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = "Remove",
-                                        tint = MaterialTheme.colorScheme.error
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
@@ -251,6 +321,23 @@ fun ImagesToPdfScreen(
                                         selected = uiState.orientation == orientation,
                                         onClick = { viewModel.onEvent(ImagesToPdfUiEvent.SelectOrientation(orientation)) },
                                         label = orientation.displayName
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Text(
+                                text = "Page Margins",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                PdfMargin.entries.forEach { margin ->
+                                    DocuFilterChip(
+                                        selected = uiState.margin == margin,
+                                        onClick = { viewModel.onEvent(ImagesToPdfUiEvent.SelectMargin(margin)) },
+                                        label = margin.displayName
                                     )
                                 }
                             }

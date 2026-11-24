@@ -3,6 +3,7 @@ package com.example.documate.core.data.repository
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.core.content.FileProvider
 import com.example.documate.core.common.AppResult
 import com.example.documate.core.domain.model.DocumentFile
 import com.example.documate.core.domain.repository.DocumentRepository
@@ -81,6 +82,30 @@ class AndroidDocumentRepository(
             AppResult.Success(destFile.absolutePath)
         } catch (e: Exception) {
             AppResult.Error("Failed to export document: ${e.message}", e)
+        }
+    }
+
+    override suspend fun copyFileToUri(sourceFile: File, destinationUriString: String): AppResult<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val destUri = Uri.parse(destinationUriString)
+            context.contentResolver.openOutputStream(destUri)?.use { output ->
+                sourceFile.inputStream().use { input ->
+                    input.copyTo(output)
+                }
+            } ?: return@withContext AppResult.Error("Could not open destination output stream")
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error("Failed to save file to destination: ${e.message}", e)
+        }
+    }
+
+    override fun getShareableUri(file: File): AppResult<String> {
+        return try {
+            val authority = "${context.packageName}.fileprovider"
+            val uri = FileProvider.getUriForFile(context, authority, file)
+            AppResult.Success(uri.toString())
+        } catch (e: Exception) {
+            AppResult.Error("Failed to resolve shareable URI: ${e.message}", e)
         }
     }
 

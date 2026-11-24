@@ -12,8 +12,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SaveAlt
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -33,7 +34,8 @@ fun DocuResultCard(
     onPreview: () -> Unit,
     onShare: () -> Unit,
     onConvertAnother: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSaveToStorage: (() -> Unit)? = null
 ) {
     DocuCard(modifier = modifier.fillMaxWidth(), padding = 16.dp) {
         Column(
@@ -98,6 +100,16 @@ fun DocuResultCard(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            if (onSaveToStorage != null) {
+                DocuPrimaryButton(
+                    text = "Save to Device",
+                    onClick = onSaveToStorage,
+                    icon = Icons.Default.SaveAlt,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -108,7 +120,7 @@ fun DocuResultCard(
                     icon = Icons.AutoMirrored.Filled.OpenInNew,
                     modifier = Modifier.weight(1f)
                 )
-                DocuPrimaryButton(
+                DocuSecondaryButton(
                     text = "Share",
                     onClick = onShare,
                     icon = Icons.Default.Share,

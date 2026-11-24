@@ -36,8 +36,7 @@ object AppViewModelProvider {
             val app = docuMateApplication()
             ImagesToPdfViewModel(
                 documentRepository = app.container.documentRepository,
-                pdfRepository = app.container.pdfRepository,
-                historyRepository = app.container.historyRepository
+                convertImagesToPdfUseCase = app.container.convertImagesToPdfUseCase
             )
         }
         initializer {

@@ -18,6 +18,15 @@ enum class PdfOrientation(val displayName: String) {
 }
 
 /**
+ * Margins applied to PDF pages around images.
+ */
+enum class PdfMargin(val displayName: String, val marginPt: Int) {
+    NONE("None", 0),
+    SMALL("Small (16pt)", 16),
+    NORMAL("Normal (32pt)", 32)
+}
+
+/**
  * Presets for document compression.
  */
 enum class CompressionPreset(

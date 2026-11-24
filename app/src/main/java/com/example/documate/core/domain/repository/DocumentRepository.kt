@@ -25,6 +25,16 @@ interface DocumentRepository {
     suspend fun exportFile(sourceFile: File, destinationFileName: String): AppResult<String>
 
     /**
+     * Copies a file to a user-selected SAF content URI.
+     */
+    suspend fun copyFileToUri(sourceFile: File, destinationUriString: String): AppResult<Unit>
+
+    /**
+     * Resolves a shareable content URI (e.g., via FileProvider) for external viewer or sharing intents.
+     */
+    fun getShareableUri(file: File): AppResult<String>
+
+    /**
      * Cleans up temporary working files created during processing.
      */
     suspend fun clearTemporaryFiles(): AppResult<Unit>

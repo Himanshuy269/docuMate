@@ -9,6 +9,7 @@ import com.example.documate.core.domain.repository.HistoryRepository
 import com.example.documate.core.domain.repository.OfficeConversionRepository
 import com.example.documate.core.domain.repository.PdfRepository
 import com.example.documate.feature.history.data.InMemoryHistoryRepository
+import com.example.documate.feature.images_to_pdf.domain.usecase.ConvertImagesToPdfUseCase
 
 /**
  * Dependency Injection container providing application-scoped singleton instances.
@@ -19,6 +20,7 @@ interface AppContainer {
     val documentRepository: DocumentRepository
     val pdfRepository: PdfRepository
     val officeConversionRepository: OfficeConversionRepository
+    val convertImagesToPdfUseCase: ConvertImagesToPdfUseCase
 }
 
 /**
@@ -39,5 +41,13 @@ class DefaultAppContainer(private val applicationContext: Context) : AppContaine
 
     override val officeConversionRepository: OfficeConversionRepository by lazy {
         DefaultOfficeConversionRepository(applicationContext)
+    }
+
+    override val convertImagesToPdfUseCase: ConvertImagesToPdfUseCase by lazy {
+        ConvertImagesToPdfUseCase(
+            documentRepository = documentRepository,
+            pdfRepository = pdfRepository,
+            historyRepository = historyRepository
+        )
     }
 }

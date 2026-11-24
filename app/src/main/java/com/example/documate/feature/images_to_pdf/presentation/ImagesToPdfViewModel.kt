@@ -3,12 +3,9 @@ package com.example.documate.feature.images_to_pdf.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.documate.core.common.AppResult
-import com.example.documate.core.domain.model.ConversionRecord
 import com.example.documate.core.domain.model.DocumentFile
-import com.example.documate.core.domain.model.DocumentTool
 import com.example.documate.core.domain.repository.DocumentRepository
-import com.example.documate.core.domain.repository.HistoryRepository
-import com.example.documate.core.domain.repository.PdfRepository
+import com.example.documate.feature.images_to_pdf.domain.usecase.ConvertImagesToPdfUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,12 +13,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
-import java.util.UUID
+import java.net.URI
 
 class ImagesToPdfViewModel(
     private val documentRepository: DocumentRepository,
-    private val pdfRepository: PdfRepository,
-    private val historyRepository: HistoryRepository
+    private val convertImagesToPdfUseCase: ConvertImagesToPdfUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ImagesToPdfUiState())
@@ -34,12 +30,16 @@ class ImagesToPdfViewModel(
             is ImagesToPdfUiEvent.AddImages -> handleAddImages(event.uriStrings)
             is ImagesToPdfUiEvent.RemoveImage -> handleRemoveImage(event.index)
             is ImagesToPdfUiEvent.MoveImage -> handleMoveImage(event.fromIndex, event.toIndex)
+            is ImagesToPdfUiEvent.ClearAllImages -> _uiState.update { it.copy(selectedImages = emptyList()) }
             is ImagesToPdfUiEvent.SelectPageSize -> _uiState.update { it.copy(pageSize = event.size) }
             is ImagesToPdfUiEvent.SelectOrientation -> _uiState.update { it.copy(orientation = event.orientation) }
+            is ImagesToPdfUiEvent.SelectMargin -> _uiState.update { it.copy(margin = event.margin) }
             is ImagesToPdfUiEvent.UpdateOutputFileName -> _uiState.update { it.copy(outputFileName = event.name) }
             is ImagesToPdfUiEvent.StartConversion -> handleStartConversion()
             is ImagesToPdfUiEvent.CancelConversion -> handleCancelConversion()
+            is ImagesToPdfUiEvent.SavePdfToUri -> handleSavePdfToUri(event.destinationUriString)
             is ImagesToPdfUiEvent.ClearError -> _uiState.update { it.copy(errorMessage = null) }
+            is ImagesToPdfUiEvent.ClearSaveSuccess -> _uiState.update { it.copy(saveSuccessMessage = null) }
             is ImagesToPdfUiEvent.Reset -> _uiState.update {
                 ImagesToPdfUiState(outputFileName = "Images_${System.currentTimeMillis() / 1000}")
             }
@@ -101,68 +101,37 @@ class ImagesToPdfViewModel(
                 )
             }
 
-            // Copy to app cache
-            val tempFiles = mutableListOf<File>()
-            for (image in state.selectedImages) {
-                when (val copyResult = documentRepository.copyToAppCache(image.uriString, image.name)) {
-                    is AppResult.Success -> tempFiles.add(copyResult.data)
-                    is AppResult.Error -> {
-                        _uiState.update {
-                            it.copy(
-                                isProcessing = false,
-                                errorMessage = "Failed to cache image ${image.name}: ${copyResult.message}"
-                            )
-                        }
-                        return@launch
-                    }
-                    else -> {}
-                }
-            }
-
-            _uiState.update { it.copy(statusMessage = "Generating PDF document...", progress = 0.3f) }
-
-            val conversionResult = pdfRepository.createPdfFromImages(
-                imageFiles = tempFiles,
+            val conversionResult = convertImagesToPdfUseCase(
+                selectedImages = state.selectedImages,
                 pageSize = state.pageSize,
                 orientation = state.orientation,
+                margin = state.margin,
                 outputFileName = state.outputFileName,
-                onProgress = { p ->
-                    _uiState.update { it.copy(progress = 0.3f + p * 0.6f) }
+                onProgress = { p, status ->
+                    _uiState.update { it.copy(progress = p, statusMessage = status) }
                 }
             )
 
             when (conversionResult) {
                 is AppResult.Success -> {
-                    val outputFile = conversionResult.data
-                    val totalOriginalSize = state.selectedImages.sumOf { it.sizeBytes }
-                    val resultDoc = DocumentFile(
-                        id = UUID.randomUUID().toString(),
-                        name = outputFile.name,
-                        uriString = outputFile.toURI().toString(),
-                        sizeBytes = outputFile.length(),
-                        mimeType = "application/pdf",
-                        extension = "pdf"
-                    )
-
-                    // Add record to history
-                    val record = ConversionRecord(
-                        id = UUID.randomUUID().toString(),
-                        tool = DocumentTool.IMAGES_TO_PDF,
-                        sourceFileName = "${state.selectedImages.size} images",
-                        outputFileName = outputFile.name,
-                        outputPath = outputFile.absolutePath,
-                        originalSizeBytes = totalOriginalSize,
-                        outputSizeBytes = outputFile.length(),
-                        timestampMillis = System.currentTimeMillis()
-                    )
-                    historyRepository.addRecord(record)
+                    val resultDoc = conversionResult.data
+                    val shareableUri = try {
+                        val file = File(URI(resultDoc.uriString))
+                        when (val shareResult = documentRepository.getShareableUri(file)) {
+                            is AppResult.Success -> shareResult.data
+                            else -> resultDoc.uriString
+                        }
+                    } catch (_: Exception) {
+                        resultDoc.uriString
+                    }
 
                     _uiState.update {
                         it.copy(
                             isProcessing = false,
                             progress = 1.0f,
                             statusMessage = null,
-                            resultFile = resultDoc
+                            resultFile = resultDoc,
+                            shareableUriString = shareableUri
                         )
                     }
                 }
@@ -175,6 +144,26 @@ class ImagesToPdfViewModel(
                     }
                 }
                 else -> {}
+            }
+        }
+    }
+
+    private fun handleSavePdfToUri(destinationUriString: String) {
+        val resultFile = _uiState.value.resultFile ?: return
+        viewModelScope.launch {
+            try {
+                val file = File(URI(resultFile.uriString))
+                when (val saveResult = documentRepository.copyFileToUri(file, destinationUriString)) {
+                    is AppResult.Success -> {
+                        _uiState.update { it.copy(saveSuccessMessage = "PDF saved to selected destination successfully!") }
+                    }
+                    is AppResult.Error -> {
+                        _uiState.update { it.copy(errorMessage = "Failed to save PDF: ${saveResult.message}") }
+                    }
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Failed to save file: ${e.message}") }
             }
         }
     }
