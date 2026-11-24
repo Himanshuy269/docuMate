@@ -27,7 +27,6 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,7 +46,6 @@ import com.example.documate.core.ui.components.DocuFileCard
 import com.example.documate.core.ui.components.DocuPrimaryButton
 import com.example.documate.core.ui.components.DocuProgressCard
 import com.example.documate.core.ui.components.DocuResultCard
-import com.example.documate.core.ui.components.DocuSecondaryButton
 import com.example.documate.core.ui.components.DocuSectionHeader
 import com.example.documate.core.ui.components.DocuTopAppBar
 
@@ -67,10 +65,25 @@ fun PdfCompressorScreen(
         uri?.let { viewModel.onEvent(PdfCompressorUiEvent.SelectPdf(it.toString())) }
     }
 
+    val saveDocLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        uri?.let {
+            viewModel.onEvent(PdfCompressorUiEvent.SavePdfToUri(it.toString()))
+        }
+    }
+
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { error ->
             snackbarHostState.showSnackbar(error)
             viewModel.onEvent(PdfCompressorUiEvent.ClearError)
+        }
+    }
+
+    LaunchedEffect(uiState.saveSuccessMessage) {
+        uiState.saveSuccessMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.onEvent(PdfCompressorUiEvent.ClearSaveSuccess)
         }
     }
 
@@ -108,19 +121,28 @@ fun PdfCompressorScreen(
                         resultFile = uiState.resultFile!!,
                         originalFileSizeBytes = uiState.selectedPdf?.sizeBytes,
                         onPreview = {
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(Uri.parse(uiState.resultFile!!.uriString), "application/pdf")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Preview PDF"))
+                            try {
+                                val targetUri = Uri.parse(uiState.shareableUriString ?: uiState.resultFile!!.uriString)
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(targetUri, "application/pdf")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Preview PDF"))
+                            } catch (_: Exception) {}
                         },
                         onShare = {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "application/pdf"
-                                putExtra(Intent.EXTRA_STREAM, Uri.parse(uiState.resultFile!!.uriString))
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Share PDF"))
+                            try {
+                                val targetUri = Uri.parse(uiState.shareableUriString ?: uiState.resultFile!!.uriString)
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/pdf"
+                                    putExtra(Intent.EXTRA_STREAM, targetUri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Share PDF"))
+                            } catch (_: Exception) {}
+                        },
+                        onSaveToStorage = {
+                            saveDocLauncher.launch(uiState.resultFile!!.name)
                         },
                         onConvertAnother = { viewModel.onEvent(PdfCompressorUiEvent.Reset) }
                     )
@@ -148,6 +170,15 @@ fun PdfCompressorScreen(
                             file = uiState.selectedPdf!!,
                             onRemove = { viewModel.onEvent(PdfCompressorUiEvent.RemovePdf) }
                         )
+                        if (uiState.pdfPageCount > 0) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Document contains ${uiState.pdfPageCount} page${if (uiState.pdfPageCount > 1) "s" else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
                     }
                 }
 

@@ -8,8 +8,10 @@ import com.example.documate.core.domain.repository.DocumentRepository
 import com.example.documate.core.domain.repository.HistoryRepository
 import com.example.documate.core.domain.repository.OfficeConversionRepository
 import com.example.documate.core.domain.repository.PdfRepository
+import com.example.documate.feature.add_images_to_pdf.domain.usecase.AddImagesToPdfUseCase
 import com.example.documate.feature.history.data.InMemoryHistoryRepository
 import com.example.documate.feature.images_to_pdf.domain.usecase.ConvertImagesToPdfUseCase
+import com.example.documate.feature.pdf_compressor.domain.usecase.CompressPdfUseCase
 
 /**
  * Dependency Injection container providing application-scoped singleton instances.
@@ -21,6 +23,8 @@ interface AppContainer {
     val pdfRepository: PdfRepository
     val officeConversionRepository: OfficeConversionRepository
     val convertImagesToPdfUseCase: ConvertImagesToPdfUseCase
+    val addImagesToPdfUseCase: AddImagesToPdfUseCase
+    val compressPdfUseCase: CompressPdfUseCase
 }
 
 /**
@@ -45,6 +49,22 @@ class DefaultAppContainer(private val applicationContext: Context) : AppContaine
 
     override val convertImagesToPdfUseCase: ConvertImagesToPdfUseCase by lazy {
         ConvertImagesToPdfUseCase(
+            documentRepository = documentRepository,
+            pdfRepository = pdfRepository,
+            historyRepository = historyRepository
+        )
+    }
+
+    override val addImagesToPdfUseCase: AddImagesToPdfUseCase by lazy {
+        AddImagesToPdfUseCase(
+            documentRepository = documentRepository,
+            pdfRepository = pdfRepository,
+            historyRepository = historyRepository
+        )
+    }
+
+    override val compressPdfUseCase: CompressPdfUseCase by lazy {
+        CompressPdfUseCase(
             documentRepository = documentRepository,
             pdfRepository = pdfRepository,
             historyRepository = historyRepository

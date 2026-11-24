@@ -3,11 +3,15 @@ package com.example.documate.core.data.repository
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
+import android.graphics.pdf.PdfRenderer
 import android.media.ExifInterface
+import android.os.ParcelFileDescriptor
 import com.example.documate.core.common.AppResult
 import com.example.documate.core.domain.model.CompressionPreset
 import com.example.documate.core.domain.model.PdfMargin
@@ -15,8 +19,8 @@ import com.example.documate.core.domain.model.PdfOrientation
 import com.example.documate.core.domain.model.PdfPageSize
 import com.example.documate.core.domain.repository.PdfRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.max
@@ -176,18 +180,104 @@ class DefaultPdfRepository(
         outputFileName: String,
         onProgress: (Float) -> Unit
     ): AppResult<File> = withContext(Dispatchers.IO) {
+        if (!existingPdfFile.exists() || existingPdfFile.length() == 0L) {
+            return@withContext AppResult.Error("Source PDF does not exist or is empty")
+        }
+        if (imageFiles.isEmpty()) {
+            return@withContext AppResult.Error("No image files provided for insertion")
+        }
+
+        var pfd: ParcelFileDescriptor? = null
+        var renderer: PdfRenderer? = null
+        val pdfDocument = PdfDocument()
+
         try {
-            for (step in 1..4) {
-                delay(150)
-                onProgress(step / 4f)
+            pfd = ParcelFileDescriptor.open(existingPdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            renderer = try {
+                PdfRenderer(pfd)
+            } catch (e: SecurityException) {
+                return@withContext AppResult.Error("Source PDF is password-protected or encrypted", e)
             }
+
+            val existingPageCount = renderer.pageCount
+            if (existingPageCount <= 0) {
+                return@withContext AppResult.Error("Source PDF contains no readable pages")
+            }
+
+            // Determine insert index (0-based)
+            // insertPositionPage: 0 -> beginning; -1 -> end; 1..pageCount -> after page N
+            val insertIndex = when {
+                insertPositionPage <= 0 && insertPositionPage != -1 -> 0
+                insertPositionPage == -1 || insertPositionPage >= existingPageCount -> existingPageCount
+                else -> insertPositionPage
+            }
+
+            val totalOperations = existingPageCount + imageFiles.size
+            var currentOp = 0
+            var newPageNumber = 1
+
+            val paint = Paint().apply {
+                isFilterBitmap = true
+                isDither = true
+            }
+
+            // Reference dimensions from first page of existing document
+            val firstPage = renderer.openPage(0)
+            val defaultWidth = firstPage.width
+            val defaultHeight = firstPage.height
+            firstPage.close()
+
+            // 1. Existing pages before insertIndex
+            for (i in 0 until insertIndex) {
+                val page = renderer.openPage(i)
+                renderPdfPageToDocument(pdfDocument, page, newPageNumber++, paint)
+                page.close()
+                currentOp++
+                onProgress(currentOp.toFloat() / totalOperations)
+            }
+
+            // 2. Insert new image pages
+            for (imageFile in imageFiles) {
+                renderImagePageToDocument(
+                    pdfDocument = pdfDocument,
+                    imageFile = imageFile,
+                    targetPageNumber = newPageNumber++,
+                    defaultWidth = defaultWidth,
+                    defaultHeight = defaultHeight,
+                    paint = paint
+                )
+                currentOp++
+                onProgress(currentOp.toFloat() / totalOperations)
+            }
+
+            // 3. Existing pages after insertIndex
+            for (i in insertIndex until existingPageCount) {
+                val page = renderer.openPage(i)
+                renderPdfPageToDocument(pdfDocument, page, newPageNumber++, paint)
+                page.close()
+                currentOp++
+                onProgress(currentOp.toFloat() / totalOperations)
+            }
+
             val outputDir = File(context.filesDir, "generated_pdfs").apply { mkdirs() }
-            val cleanName = if (outputFileName.endsWith(".pdf", ignoreCase = true)) outputFileName else "$outputFileName.pdf"
+            val cleanName = if (outputFileName.endsWith(".pdf", ignoreCase = true)) {
+                outputFileName
+            } else {
+                "$outputFileName.pdf"
+            }
             val outputFile = File(outputDir, cleanName)
-            existingPdfFile.copyTo(outputFile, overwrite = true)
+
+            FileOutputStream(outputFile).use { outStream ->
+                pdfDocument.writeTo(outStream)
+            }
+
             AppResult.Success(outputFile)
         } catch (e: Exception) {
             AppResult.Error("Failed to insert images into PDF: ${e.message}", e)
+        } finally {
+            try { renderer?.close() } catch (_: Exception) {}
+            try { pfd?.close() } catch (_: Exception) {}
+            try { pdfDocument.close() } catch (_: Exception) {}
         }
     }
 
@@ -197,22 +287,214 @@ class DefaultPdfRepository(
         outputFileName: String,
         onProgress: (Float) -> Unit
     ): AppResult<File> = withContext(Dispatchers.IO) {
+        if (!sourcePdfFile.exists() || sourcePdfFile.length() == 0L) {
+            return@withContext AppResult.Error("Source PDF file does not exist or is empty")
+        }
+
+        var pfd: ParcelFileDescriptor? = null
+        var renderer: PdfRenderer? = null
+        val pdfDocument = PdfDocument()
+
         try {
-            for (step in 1..5) {
-                delay(120)
-                onProgress(step / 5f)
+            pfd = ParcelFileDescriptor.open(sourcePdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            renderer = try {
+                PdfRenderer(pfd)
+            } catch (e: SecurityException) {
+                return@withContext AppResult.Error("Source PDF is password-protected or encrypted", e)
             }
+
+            val pageCount = renderer.pageCount
+            if (pageCount <= 0) {
+                return@withContext AppResult.Error("Source PDF contains no readable pages")
+            }
+
+            val paint = Paint().apply {
+                isFilterBitmap = true
+                isDither = true
+            }
+
+            val quality = preset.targetQualityPercent
+            val targetDpi = preset.imageDpi.toFloat()
+            // Standard PDF base DPI is 72 pt/inch
+            val scaleFactor = (targetDpi / 72f).coerceIn(0.75f, 2.5f)
+
+            for (i in 0 until pageCount) {
+                val page = renderer.openPage(i)
+                val widthPt = page.width
+                val heightPt = page.height
+
+                val renderWidth = (widthPt * scaleFactor).toInt().coerceAtLeast(1)
+                val renderHeight = (heightPt * scaleFactor).toInt().coerceAtLeast(1)
+
+                val bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                canvas.drawColor(Color.WHITE)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                page.close()
+
+                // Compress bitmap using JPEG stream at the preset quality
+                val byteStream = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, quality, byteStream)
+                bitmap.recycle()
+
+                val compressedBytes = byteStream.toByteArray()
+                val compressedBitmap = BitmapFactory.decodeByteArray(compressedBytes, 0, compressedBytes.size)
+
+                val pageInfo = PdfDocument.PageInfo.Builder(widthPt, heightPt, i + 1).create()
+                val newPage = pdfDocument.startPage(pageInfo)
+                newPage.canvas.drawColor(Color.WHITE)
+                val destRect = RectF(0f, 0f, widthPt.toFloat(), heightPt.toFloat())
+                newPage.canvas.drawBitmap(compressedBitmap, null, destRect, paint)
+                pdfDocument.finishPage(newPage)
+
+                compressedBitmap?.recycle()
+
+                onProgress((i + 1).toFloat() / pageCount)
+            }
+
             val outputDir = File(context.filesDir, "compressed_pdfs").apply { mkdirs() }
-            val cleanName = if (outputFileName.endsWith(".pdf", ignoreCase = true)) outputFileName else "$outputFileName.pdf"
+            val cleanName = if (outputFileName.endsWith(".pdf", ignoreCase = true)) {
+                outputFileName
+            } else {
+                "$outputFileName.pdf"
+            }
             val outputFile = File(outputDir, cleanName)
-            sourcePdfFile.copyTo(outputFile, overwrite = true)
+
+            FileOutputStream(outputFile).use { outStream ->
+                pdfDocument.writeTo(outStream)
+            }
+
             AppResult.Success(outputFile)
         } catch (e: Exception) {
             AppResult.Error("PDF compression failed: ${e.message}", e)
+        } finally {
+            try { renderer?.close() } catch (_: Exception) {}
+            try { pfd?.close() } catch (_: Exception) {}
+            try { pdfDocument.close() } catch (_: Exception) {}
+        }
+    }
+
+    override suspend fun getPdfPageCount(pdfFile: File): AppResult<Int> = withContext(Dispatchers.IO) {
+        if (!pdfFile.exists() || pdfFile.length() == 0L) {
+            return@withContext AppResult.Error("PDF file does not exist or is empty")
+        }
+        var pfd: ParcelFileDescriptor? = null
+        var renderer: PdfRenderer? = null
+        try {
+            pfd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            renderer = PdfRenderer(pfd)
+            AppResult.Success(renderer.pageCount)
+        } catch (e: Exception) {
+            AppResult.Error("Failed to inspect PDF pages: ${e.message}", e)
+        } finally {
+            try { renderer?.close() } catch (_: Exception) {}
+            try { pfd?.close() } catch (_: Exception) {}
         }
     }
 
     // --- Private Helper Functions for Memory Safety & Geometry ---
+
+    private fun renderPdfPageToDocument(
+        pdfDocument: PdfDocument,
+        rendererPage: PdfRenderer.Page,
+        targetPageNumber: Int,
+        paint: Paint
+    ) {
+        val width = rendererPage.width
+        val height = rendererPage.height
+
+        val scale = min(2.0f, max(1.0f, 2000f / max(width, height)))
+        val bmpWidth = (width * scale).toInt().coerceAtLeast(1)
+        val bmpHeight = (height * scale).toInt().coerceAtLeast(1)
+
+        val bitmap = Bitmap.createBitmap(bmpWidth, bmpHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)
+        rendererPage.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+
+        val pageInfo = PdfDocument.PageInfo.Builder(width, height, targetPageNumber).create()
+        val newPage = pdfDocument.startPage(pageInfo)
+        newPage.canvas.drawColor(Color.WHITE)
+        val destRect = RectF(0f, 0f, width.toFloat(), height.toFloat())
+        newPage.canvas.drawBitmap(bitmap, null, destRect, paint)
+        pdfDocument.finishPage(newPage)
+
+        bitmap.recycle()
+    }
+
+    private fun renderImagePageToDocument(
+        pdfDocument: PdfDocument,
+        imageFile: File,
+        targetPageNumber: Int,
+        defaultWidth: Int = 595,
+        defaultHeight: Int = 842,
+        paint: Paint
+    ): Boolean {
+        if (!imageFile.exists() || imageFile.length() == 0L) return false
+
+        val rotationDegrees = getExifRotation(imageFile)
+
+        val boundsOptions = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeFile(imageFile.absolutePath, boundsOptions)
+        val rawWidth = boundsOptions.outWidth
+        val rawHeight = boundsOptions.outHeight
+        if (rawWidth <= 0 || rawHeight <= 0) return false
+
+        val isRotated90or270 = rotationDegrees == 90 || rotationDegrees == 270
+        val orientedWidth = if (isRotated90or270) rawHeight else rawWidth
+        val orientedHeight = if (isRotated90or270) rawWidth else rawHeight
+
+        val pageWidth = defaultWidth
+        val pageHeight = defaultHeight
+
+        val sampleSize = calculateInSampleSize(
+            rawWidth = rawWidth,
+            rawHeight = rawHeight,
+            reqWidth = min(orientedWidth, max(pageWidth * 2, 1200)),
+            reqHeight = min(orientedHeight, max(pageHeight * 2, 1600))
+        )
+
+        val decodeOptions = BitmapFactory.Options().apply {
+            inJustDecodeBounds = false
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val rawBitmap = BitmapFactory.decodeFile(imageFile.absolutePath, decodeOptions) ?: return false
+
+        val finalBitmap = if (rotationDegrees != 0) {
+            val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+            val rotated = Bitmap.createBitmap(
+                rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true
+            )
+            if (rotated != rawBitmap) {
+                rawBitmap.recycle()
+            }
+            rotated
+        } else {
+            rawBitmap
+        }
+
+        val scale = min(
+            pageWidth.toFloat() / finalBitmap.width,
+            pageHeight.toFloat() / finalBitmap.height
+        )
+        val destWidth = finalBitmap.width * scale
+        val destHeight = finalBitmap.height * scale
+        val destLeft = (pageWidth - destWidth) / 2f
+        val destTop = (pageHeight - destHeight) / 2f
+        val destRect = RectF(destLeft, destTop, destLeft + destWidth, destTop + destHeight)
+
+        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, targetPageNumber).create()
+        val page = pdfDocument.startPage(pageInfo)
+        page.canvas.drawColor(Color.WHITE)
+        page.canvas.drawBitmap(finalBitmap, null, destRect, paint)
+        pdfDocument.finishPage(page)
+
+        finalBitmap.recycle()
+        return true
+    }
 
     private fun getExifRotation(file: File): Int {
         return try {

@@ -9,6 +9,8 @@ sealed interface PdfCompressorUiEvent {
     data class UpdateOutputFileName(val name: String) : PdfCompressorUiEvent
     data object StartCompression : PdfCompressorUiEvent
     data object CancelCompression : PdfCompressorUiEvent
+    data class SavePdfToUri(val destinationUriString: String) : PdfCompressorUiEvent
     data object ClearError : PdfCompressorUiEvent
+    data object ClearSaveSuccess : PdfCompressorUiEvent
     data object Reset : PdfCompressorUiEvent
 }

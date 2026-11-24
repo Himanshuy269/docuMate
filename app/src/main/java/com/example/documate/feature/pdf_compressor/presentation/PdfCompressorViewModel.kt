@@ -3,12 +3,10 @@ package com.example.documate.feature.pdf_compressor.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.documate.core.common.AppResult
-import com.example.documate.core.domain.model.ConversionRecord
 import com.example.documate.core.domain.model.DocumentFile
-import com.example.documate.core.domain.model.DocumentTool
 import com.example.documate.core.domain.repository.DocumentRepository
-import com.example.documate.core.domain.repository.HistoryRepository
 import com.example.documate.core.domain.repository.PdfRepository
+import com.example.documate.feature.pdf_compressor.domain.usecase.CompressPdfUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,12 +14,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
-import java.util.UUID
+import java.net.URI
 
 class PdfCompressorViewModel(
     private val documentRepository: DocumentRepository,
     private val pdfRepository: PdfRepository,
-    private val historyRepository: HistoryRepository
+    private val compressPdfUseCase: CompressPdfUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PdfCompressorUiState())
@@ -32,12 +30,14 @@ class PdfCompressorViewModel(
     fun onEvent(event: PdfCompressorUiEvent) {
         when (event) {
             is PdfCompressorUiEvent.SelectPdf -> handleSelectPdf(event.uriString)
-            is PdfCompressorUiEvent.RemovePdf -> _uiState.update { it.copy(selectedPdf = null) }
+            is PdfCompressorUiEvent.RemovePdf -> _uiState.update { it.copy(selectedPdf = null, pdfPageCount = 0) }
             is PdfCompressorUiEvent.SelectPreset -> _uiState.update { it.copy(selectedPreset = event.preset) }
             is PdfCompressorUiEvent.UpdateOutputFileName -> _uiState.update { it.copy(outputFileName = event.name) }
             is PdfCompressorUiEvent.StartCompression -> handleStartCompression()
             is PdfCompressorUiEvent.CancelCompression -> handleCancelCompression()
+            is PdfCompressorUiEvent.SavePdfToUri -> handleSavePdfToUri(event.destinationUriString)
             is PdfCompressorUiEvent.ClearError -> _uiState.update { it.copy(errorMessage = null) }
+            is PdfCompressorUiEvent.ClearSaveSuccess -> _uiState.update { it.copy(saveSuccessMessage = null) }
             is PdfCompressorUiEvent.Reset -> _uiState.update { PdfCompressorUiState() }
         }
     }
@@ -48,9 +48,24 @@ class PdfCompressorViewModel(
                 is AppResult.Success -> {
                     val pdf = result.data
                     val cleanBaseName = pdf.name.substringBeforeLast('.')
+
+                    var pageCount = 1
+                    when (val copyResult = documentRepository.copyToAppCache(pdf.uriString, pdf.name)) {
+                        is AppResult.Success -> {
+                            val tempFile = copyResult.data
+                            when (val countResult = pdfRepository.getPdfPageCount(tempFile)) {
+                                is AppResult.Success -> pageCount = countResult.data.coerceAtLeast(1)
+                                else -> {}
+                            }
+                            try { tempFile.delete() } catch (_: Exception) {}
+                        }
+                        else -> {}
+                    }
+
                     _uiState.update {
                         it.copy(
                             selectedPdf = pdf,
+                            pdfPageCount = pageCount,
                             outputFileName = "${cleanBaseName}_compressed.pdf"
                         )
                     }
@@ -65,7 +80,6 @@ class PdfCompressorViewModel(
 
     private fun handleStartCompression() {
         val state = _uiState.value
-        val pdf = state.selectedPdf ?: return
         if (!state.canCompress) return
 
         compressJob?.cancel()
@@ -73,65 +87,41 @@ class PdfCompressorViewModel(
             _uiState.update {
                 it.copy(
                     isCompressing = true,
-                    progress = 0.1f,
-                    statusMessage = "Analyzing PDF streams & images...",
+                    progress = 0.05f,
+                    statusMessage = "Analyzing PDF streams & preparing compression...",
                     errorMessage = null
                 )
             }
 
-            // Copy to cache
-            val cachedFile: File = when (val copyResult = documentRepository.copyToAppCache(pdf.uriString, pdf.name)) {
-                is AppResult.Success -> copyResult.data
-                is AppResult.Error -> {
-                    _uiState.update { it.copy(isCompressing = false, errorMessage = copyResult.message) }
-                    return@launch
-                }
-                else -> return@launch
-            }
-
-            _uiState.update { it.copy(statusMessage = "Applying ${state.selectedPreset.title}...", progress = 0.3f) }
-
-            val result = pdfRepository.compressPdf(
-                sourcePdfFile = cachedFile,
+            val result = compressPdfUseCase(
+                sourcePdf = state.selectedPdf,
                 preset = state.selectedPreset,
                 outputFileName = state.outputFileName,
-                onProgress = { p ->
-                    _uiState.update { it.copy(progress = 0.3f + p * 0.65f) }
+                onProgress = { p, status ->
+                    _uiState.update { it.copy(progress = p, statusMessage = status) }
                 }
             )
 
             when (result) {
                 is AppResult.Success -> {
-                    val outputFile = result.data
-                    // Simulate realistic compressed size based on preset
-                    val simulatedCompressedSize = (pdf.sizeBytes * (state.selectedPreset.targetQualityPercent / 100.0)).toLong().coerceAtLeast(1024L)
-                    val resultDoc = DocumentFile(
-                        id = UUID.randomUUID().toString(),
-                        name = outputFile.name,
-                        uriString = outputFile.toURI().toString(),
-                        sizeBytes = simulatedCompressedSize,
-                        mimeType = "application/pdf",
-                        extension = "pdf"
-                    )
-
-                    val record = ConversionRecord(
-                        id = UUID.randomUUID().toString(),
-                        tool = DocumentTool.PDF_COMPRESSION,
-                        sourceFileName = pdf.name,
-                        outputFileName = outputFile.name,
-                        outputPath = outputFile.absolutePath,
-                        originalSizeBytes = pdf.sizeBytes,
-                        outputSizeBytes = simulatedCompressedSize,
-                        timestampMillis = System.currentTimeMillis()
-                    )
-                    historyRepository.addRecord(record)
+                    val resultDoc = result.data
+                    val shareableUri = try {
+                        val file = File(URI(resultDoc.uriString))
+                        when (val shareResult = documentRepository.getShareableUri(file)) {
+                            is AppResult.Success -> shareResult.data
+                            else -> resultDoc.uriString
+                        }
+                    } catch (_: Exception) {
+                        resultDoc.uriString
+                    }
 
                     _uiState.update {
                         it.copy(
                             isCompressing = false,
                             progress = 1.0f,
                             statusMessage = null,
-                            resultFile = resultDoc
+                            resultFile = resultDoc,
+                            shareableUriString = shareableUri
                         )
                     }
                 }
@@ -141,6 +131,26 @@ class PdfCompressorViewModel(
                     }
                 }
                 else -> {}
+            }
+        }
+    }
+
+    private fun handleSavePdfToUri(destinationUriString: String) {
+        val resultFile = _uiState.value.resultFile ?: return
+        viewModelScope.launch {
+            try {
+                val file = File(URI(resultFile.uriString))
+                when (val saveResult = documentRepository.copyFileToUri(file, destinationUriString)) {
+                    is AppResult.Success -> {
+                        _uiState.update { it.copy(saveSuccessMessage = "Compressed PDF saved successfully!") }
+                    }
+                    is AppResult.Error -> {
+                        _uiState.update { it.copy(errorMessage = "Failed to save compressed PDF: ${saveResult.message}") }
+                    }
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Failed to save file: ${e.message}") }
             }
         }
     }

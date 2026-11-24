@@ -10,6 +10,7 @@ enum class InsertPosition(val title: String) {
 
 data class AddImagesToPdfUiState(
     val selectedPdf: DocumentFile? = null,
+    val pdfPageCount: Int = 0,
     val selectedImages: List<DocumentFile> = emptyList(),
     val insertPosition: InsertPosition = InsertPosition.AT_END,
     val specificPageNumber: Int = 1,
@@ -18,6 +19,8 @@ data class AddImagesToPdfUiState(
     val progress: Float = 0f,
     val statusMessage: String? = null,
     val resultFile: DocumentFile? = null,
+    val shareableUriString: String? = null,
+    val saveSuccessMessage: String? = null,
     val errorMessage: String? = null
 ) {
     val canProcess: Boolean

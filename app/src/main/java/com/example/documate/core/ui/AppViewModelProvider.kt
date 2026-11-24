@@ -44,7 +44,7 @@ object AppViewModelProvider {
             AddImagesToPdfViewModel(
                 documentRepository = app.container.documentRepository,
                 pdfRepository = app.container.pdfRepository,
-                historyRepository = app.container.historyRepository
+                addImagesToPdfUseCase = app.container.addImagesToPdfUseCase
             )
         }
         initializer {
@@ -52,7 +52,7 @@ object AppViewModelProvider {
             PdfCompressorViewModel(
                 documentRepository = app.container.documentRepository,
                 pdfRepository = app.container.pdfRepository,
-                historyRepository = app.container.historyRepository
+                compressPdfUseCase = app.container.compressPdfUseCase
             )
         }
         initializer {

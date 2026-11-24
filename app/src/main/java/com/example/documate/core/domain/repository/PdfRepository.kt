@@ -43,4 +43,9 @@ interface PdfRepository {
         outputFileName: String,
         onProgress: (Float) -> Unit = {}
     ): AppResult<File>
+
+    /**
+     * Inspects a PDF file and returns its total page count.
+     */
+    suspend fun getPdfPageCount(pdfFile: File): AppResult<Int> = AppResult.Success(0)
 }
