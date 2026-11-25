@@ -8,11 +8,6 @@ import kotlin.random.Random
 expect fun currentTimeMillis(): Long
 
 /**
- * Multiplatform helper to format a timestamp into a time string (e.g., "3:45 PM").
- */
-expect fun formatTimestamp(timestampMillis: Long): String
-
-/**
  * Universal pseudo-UUID generator formatted as 8-4-4-4-12 hex string.
  */
 fun generateUuid(): String {
@@ -37,4 +32,22 @@ fun formatFileSize(bytes: Long): String {
     }
     val rounded = (b * 10).toLong() / 10.0
     return "$rounded ${units[unitIndex]}"
+}
+
+/**
+ * Multiplatform timestamp formatting helper.
+ */
+fun formatTimestamp(timestampMillis: Long): String {
+    val diff = (currentTimeMillis() - timestampMillis).coerceAtLeast(0)
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+    return when {
+        days > 30 -> "${days / 30}mo ago"
+        days > 0 -> "${days}d ago"
+        hours > 0 -> "${hours}h ago"
+        minutes > 0 -> "${minutes}m ago"
+        else -> "Just now"
+    }
 }

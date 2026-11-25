@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <files-path name="generated_pdfs" path="generated_pdfs/" />
-    <files-path name="office_pdfs" path="office_pdfs/" />
-    <files-path name="compressed_pdfs" path="compressed_pdfs/" />
-    <files-path name="exports" path="exports/" />
-    <cache-path name="cache_temp" path="documate_temp/" />
-</paths>

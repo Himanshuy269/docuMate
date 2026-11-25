@@ -51,17 +51,26 @@
     <div id="loading">
         <div class="spinner"></div>
         <h3 style="margin: 0 0 8px 0; font-weight: 600;">DocuMate</h3>
-        <p style="margin: 0; color: #44474F; font-size: 14px;">Loading WebAssembly application...</p>
+        <p id="loading-status" style="margin: 0; color: #44474F; font-size: 14px;">Loading WebAssembly application...</p>
     </div>
     <script>
+        window.addEventListener('error', function(e) {
+            const status = document.getElementById('loading-status');
+            if (status) {
+                status.innerHTML = '<span style="color:#DC2626; font-weight: 500;">Failed to load application</span><br><small style="color:#6B7280; margin-top:4px; display:inline-block;">' + (e.message || 'Check console logs or run via local HTTP server') + '</small>';
+            }
+        });
+
         window.addEventListener('load', () => {
             const loader = document.getElementById('loading');
             if (loader) {
                 setTimeout(() => {
-                    loader.style.opacity = '0';
-                    loader.style.transition = 'opacity 0.3s ease';
-                    setTimeout(() => loader.remove(), 300);
-                }, 500);
+                    if (document.querySelector('canvas')) {
+                        loader.style.opacity = '0';
+                        loader.style.transition = 'opacity 0.3s ease';
+                        setTimeout(() => loader.remove(), 300);
+                    }
+                }, 1000);
             }
         });
     </script>

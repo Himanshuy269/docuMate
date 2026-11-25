@@ -70,6 +70,7 @@ enum class DocumentTool(
 
     companion object {
         val COMPRESS_PDF: DocumentTool get() = PDF_COMPRESSION
+        val PDF_COMPRESSOR: DocumentTool get() = PDF_COMPRESSION
         fun fromId(id: String): DocumentTool? = entries.find { it.id == id }
     }
 }
