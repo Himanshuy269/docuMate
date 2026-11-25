@@ -101,8 +101,8 @@ See [SECURITY.md](SECURITY.md) for the full threat model and permissions audit.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/DocuMate.git
-cd DocuMate
+git clone https://github.com/Himanshuy269/docuMate.git
+cd docuMate
 ```
 
 ### 2. Open in Android Studio
@@ -194,4 +194,4 @@ Please **do not** open public GitHub issues for security vulnerabilities. Instea
 
 ## 📄 License
 
-This project is provided as-is. Add your preferred license here (e.g., MIT, Apache 2.0).
+This project is open-source under the MIT License.
