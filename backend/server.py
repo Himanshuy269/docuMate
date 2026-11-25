@@ -22,12 +22,18 @@ def convert():
     if not uploaded_file.filename:
         return jsonify({"error": "Empty filename provided"}), 400
 
-    original_filename = uploaded_file.filename
-    base_name = os.path.splitext(original_filename)[0]
+    original_filename = os.path.basename(uploaded_file.filename)
+    if not original_filename:
+        return jsonify({"error": "Invalid filename provided"}), 400
+
+    base_name = os.path.splitext(original_filename)[0] or "converted"
 
     with tempfile.TemporaryDirectory() as temp_dir:
         input_path = os.path.join(temp_dir, original_filename)
         uploaded_file.save(input_path)
+
+        if os.path.getsize(input_path) == 0:
+            return jsonify({"error": "Uploaded document is empty (0 bytes)"}), 400
 
         # Execute headless LibreOffice conversion
         cmd = [

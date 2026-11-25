@@ -281,6 +281,14 @@ class DefaultPdfRepository(
         }
     }
 
+    private data class CompressedPdfPage(
+        val widthPt: Int,
+        val heightPt: Int,
+        val renderWidth: Int,
+        val renderHeight: Int,
+        val jpegBytes: ByteArray
+    )
+
     override suspend fun compressPdf(
         sourcePdfFile: File,
         preset: CompressionPreset,
@@ -293,7 +301,6 @@ class DefaultPdfRepository(
 
         var pfd: ParcelFileDescriptor? = null
         var renderer: PdfRenderer? = null
-        val pdfDocument = PdfDocument()
 
         try {
             pfd = ParcelFileDescriptor.open(sourcePdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
@@ -308,20 +315,25 @@ class DefaultPdfRepository(
                 return@withContext AppResult.Error("Source PDF contains no readable pages")
             }
 
-            val paint = Paint().apply {
-                isFilterBitmap = true
-                isDither = true
-            }
-
-            val quality = preset.targetQualityPercent
+            val quality = preset.targetQualityPercent.coerceIn(1, 100)
             val targetDpi = preset.imageDpi.toFloat()
             // Standard PDF base DPI is 72 pt/inch
-            val scaleFactor = (targetDpi / 72f).coerceIn(0.75f, 2.5f)
+            val rawScaleFactor = targetDpi / 72f
+
+            val pages = mutableListOf<CompressedPdfPage>()
 
             for (i in 0 until pageCount) {
                 val page = renderer.openPage(i)
                 val widthPt = page.width
                 val heightPt = page.height
+
+                // Cap long edge to 2048 px to avoid memory bloat on large pages
+                val maxDim = max(widthPt, heightPt).toFloat()
+                val scaleFactor = if (maxDim * rawScaleFactor > 2048f) {
+                    (2048f / maxDim).coerceIn(0.5f, 2.0f)
+                } else {
+                    rawScaleFactor.coerceIn(0.5f, 2.0f)
+                }
 
                 val renderWidth = (widthPt * scaleFactor).toInt().coerceAtLeast(1)
                 val renderHeight = (heightPt * scaleFactor).toInt().coerceAtLeast(1)
@@ -332,24 +344,23 @@ class DefaultPdfRepository(
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                 page.close()
 
-                // Compress bitmap using JPEG stream at the preset quality
+                // Compress bitmap directly to JPEG bytes stream
                 val byteStream = ByteArrayOutputStream()
                 bitmap.compress(Bitmap.CompressFormat.JPEG, quality, byteStream)
                 bitmap.recycle()
 
-                val compressedBytes = byteStream.toByteArray()
-                val compressedBitmap = BitmapFactory.decodeByteArray(compressedBytes, 0, compressedBytes.size)
+                val jpegBytes = byteStream.toByteArray()
+                pages.add(
+                    CompressedPdfPage(
+                        widthPt = widthPt,
+                        heightPt = heightPt,
+                        renderWidth = renderWidth,
+                        renderHeight = renderHeight,
+                        jpegBytes = jpegBytes
+                    )
+                )
 
-                val pageInfo = PdfDocument.PageInfo.Builder(widthPt, heightPt, i + 1).create()
-                val newPage = pdfDocument.startPage(pageInfo)
-                newPage.canvas.drawColor(Color.WHITE)
-                val destRect = RectF(0f, 0f, widthPt.toFloat(), heightPt.toFloat())
-                newPage.canvas.drawBitmap(compressedBitmap, null, destRect, paint)
-                pdfDocument.finishPage(newPage)
-
-                compressedBitmap?.recycle()
-
-                onProgress((i + 1).toFloat() / pageCount)
+                onProgress(((i + 1).toFloat() / pageCount) * 0.9f)
             }
 
             val outputDir = File(context.filesDir, "compressed_pdfs").apply { mkdirs() }
@@ -360,9 +371,18 @@ class DefaultPdfRepository(
             }
             val outputFile = File(outputDir, cleanName)
 
-            FileOutputStream(outputFile).use { outStream ->
-                pdfDocument.writeTo(outStream)
+            // Write PDF embedding the JPEG streams directly (/Filter /DCTDecode)
+            writePdfWithJpegStreams(outputFile, pages)
+
+            // Compression safeguard:
+            // Compression must NEVER increase the size of the PDF!
+            // If the compressed output is not smaller than the source file (e.g. for pure vector/text PDFs),
+            // retain the original file so the user never gets an inflated document.
+            if (outputFile.exists() && outputFile.length() >= sourcePdfFile.length()) {
+                sourcePdfFile.copyTo(outputFile, overwrite = true)
             }
+
+            onProgress(1.0f)
 
             AppResult.Success(outputFile)
         } catch (e: Exception) {
@@ -370,7 +390,121 @@ class DefaultPdfRepository(
         } finally {
             try { renderer?.close() } catch (_: Exception) {}
             try { pfd?.close() } catch (_: Exception) {}
-            try { pdfDocument.close() } catch (_: Exception) {}
+        }
+    }
+
+    private fun writePdfWithJpegStreams(outputFile: File, pages: List<CompressedPdfPage>) {
+        FileOutputStream(outputFile).use { out ->
+            var offset = 0L
+            fun writeBytes(bytes: ByteArray) {
+                out.write(bytes)
+                offset += bytes.size
+            }
+            fun writeAscii(str: String) {
+                writeBytes(str.toByteArray(Charsets.US_ASCII))
+            }
+
+            val objOffsets = mutableMapOf<Int, Long>()
+
+            // 1. PDF Header
+            writeAscii("%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n")
+
+            // 2. Catalog (Obj 1)
+            objOffsets[1] = offset
+            writeAscii("1 0 obj\n<<\n  /Type /Catalog\n  /Pages 2 0 R\n>>\nendobj\n")
+
+            // 3. Pages Root (Obj 2)
+            objOffsets[2] = offset
+            val kidsArray = pages.indices.joinToString(" ") { k ->
+                val pageObjNum = 3 + k * 3
+                "$pageObjNum 0 R"
+            }
+            writeAscii("2 0 obj\n<<\n  /Type /Pages\n  /Kids [$kidsArray]\n  /Count ${pages.size}\n>>\nendobj\n")
+
+            // 4. Per-page objects
+            for (k in pages.indices) {
+                val page = pages[k]
+                val pageObjNum = 3 + k * 3
+                val contentObjNum = pageObjNum + 1
+                val imageObjNum = pageObjNum + 2
+                val imgName = "Im${k + 1}"
+
+                // Page Object
+                objOffsets[pageObjNum] = offset
+                writeAscii(
+                    "$pageObjNum 0 obj\n" +
+                    "<<\n" +
+                    "  /Type /Page\n" +
+                    "  /Parent 2 0 R\n" +
+                    "  /MediaBox [0 0 ${page.widthPt} ${page.heightPt}]\n" +
+                    "  /Contents $contentObjNum 0 R\n" +
+                    "  /Resources <<\n" +
+                    "    /ProcSet [/PDF /ImageC]\n" +
+                    "    /XObject <<\n" +
+                    "      /$imgName $imageObjNum 0 R\n" +
+                    "    >>\n" +
+                    "  >>\n" +
+                    ">>\n" +
+                    "endobj\n"
+                )
+
+                // Content stream object (draws the image scaled to fit the page MediaBox)
+                val contentStream = "q\n${page.widthPt} 0 0 ${page.heightPt} 0 0 cm\n/$imgName Do\nQ\n"
+                val contentBytes = contentStream.toByteArray(Charsets.US_ASCII)
+                objOffsets[contentObjNum] = offset
+                writeAscii(
+                    "$contentObjNum 0 obj\n" +
+                    "<<\n" +
+                    "  /Length ${contentBytes.size}\n" +
+                    ">>\n" +
+                    "stream\n"
+                )
+                writeBytes(contentBytes)
+                writeAscii("\nendstream\nendobj\n")
+
+                // Image XObject with /Filter /DCTDecode
+                objOffsets[imageObjNum] = offset
+                writeAscii(
+                    "$imageObjNum 0 obj\n" +
+                    "<<\n" +
+                    "  /Type /XObject\n" +
+                    "  /Subtype /Image\n" +
+                    "  /Width ${page.renderWidth}\n" +
+                    "  /Height ${page.renderHeight}\n" +
+                    "  /ColorSpace /DeviceRGB\n" +
+                    "  /BitsPerComponent 8\n" +
+                    "  /Filter /DCTDecode\n" +
+                    "  /Length ${page.jpegBytes.size}\n" +
+                    ">>\n" +
+                    "stream\n"
+                )
+                writeBytes(page.jpegBytes)
+                writeAscii("\nendstream\nendobj\n")
+            }
+
+            // 5. Cross-reference Table (xref)
+            val xrefOffset = offset
+            val totalObjs = 2 + pages.size * 3
+            writeAscii("xref\n0 ${totalObjs + 1}\n")
+            writeAscii("0000000000 65535 f \n")
+            for (objNum in 1..totalObjs) {
+                val objOff = objOffsets[objNum] ?: 0L
+                val entry = String.format(java.util.Locale.US, "%010d 00000 n \n", objOff)
+                writeAscii(entry)
+            }
+
+            // 6. Trailer
+            writeAscii(
+                "trailer\n" +
+                "<<\n" +
+                "  /Size ${totalObjs + 1}\n" +
+                "  /Root 1 0 R\n" +
+                ">>\n" +
+                "startxref\n" +
+                "$xrefOffset\n" +
+                "%%EOF\n"
+            )
+            out.flush()
         }
     }
 

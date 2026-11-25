@@ -23,5 +23,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "DocuMate"
-include(":app")
- 
+include(":composeApp")

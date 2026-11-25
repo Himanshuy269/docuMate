@@ -21,18 +21,24 @@ class HistoryViewModel(
 ) : ViewModel() {
 
     private val _selectedFilter = MutableStateFlow<ToolCategory?>(null)
+    private val _selectedTab = MutableStateFlow(HistoryFilterTab.ALL)
+    private val _searchQuery = MutableStateFlow("")
     private val _isConfirmDialogOpen = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<HistoryUiState> = combine(
         getConversionHistoryUseCase(),
         _selectedFilter,
+        _selectedTab,
+        _searchQuery,
         _isConfirmDialogOpen,
         _errorMessage
-    ) { records, filter, isDialogOpen, error ->
+    ) { records, filter, tab, query, isDialogOpen, error ->
         HistoryUiState(
             records = records,
             selectedFilter = filter,
+            selectedTab = tab,
+            searchQuery = query,
             isConfirmClearDialogOpen = isDialogOpen,
             errorMessage = error
         )
@@ -45,6 +51,8 @@ class HistoryViewModel(
     fun onEvent(event: HistoryUiEvent) {
         when (event) {
             is HistoryUiEvent.SelectFilter -> _selectedFilter.value = event.category
+            is HistoryUiEvent.SelectTab -> _selectedTab.value = event.tab
+            is HistoryUiEvent.UpdateSearch -> _searchQuery.value = event.query
             is HistoryUiEvent.DeleteRecord -> handleDeleteRecord(event.id)
             is HistoryUiEvent.ShowClearConfirmation -> _isConfirmDialogOpen.value = true
             is HistoryUiEvent.DismissClearConfirmation -> _isConfirmDialogOpen.value = false
@@ -70,7 +78,6 @@ class HistoryViewModel(
                     _errorMessage.value = result.message
                     _isConfirmDialogOpen.value = false
                 }
-                else -> _isConfirmDialogOpen.value = false
             }
         }
     }
