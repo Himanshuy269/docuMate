@@ -64,7 +64,7 @@ fun AddImagesToPdfScreen(
     val platformActions = rememberPlatformActions()
 
     val pickPdf = rememberPlatformFilePicker(
-        mimeType = "application/pdf"
+        allowedExtensions = listOf("pdf")
     ) { files ->
         files.firstOrNull()?.let {
             viewModel.onEvent(AddImagesToPdfUiEvent.SelectPdf(it.uriString))
@@ -72,7 +72,7 @@ fun AddImagesToPdfScreen(
     }
 
     val pickImages = rememberPlatformFilePicker(
-        mimeType = "image/*",
+        allowedExtensions = listOf("jpg", "jpeg", "png", "webp"),
         allowMultiple = true
     ) { files ->
         if (files.isNotEmpty()) {

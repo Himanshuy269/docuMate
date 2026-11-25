@@ -52,7 +52,7 @@ fun PowerPointToPdfScreen(
     val platformActions = rememberPlatformActions()
 
     val pickPptFile = rememberPlatformFilePicker(
-        mimeType = "*/*"
+        allowedExtensions = listOf("pptx", "ppt")
     ) { files ->
         files.firstOrNull()?.let {
             viewModel.onEvent(PowerPointToPdfUiEvent.SelectFile(it.uriString))
@@ -163,7 +163,7 @@ fun PowerPointToPdfScreen(
                                 listOf(1, 2, 4, 6).forEach { count ->
                                     DocuFilterChip(
                                         selected = uiState.slidesPerPage == count,
-                                        onClick = { viewModel.onEvent(PowerPointToPdfUiEvent.UpdateSlidesPerPage(count)) },
+                                        onClick = { viewModel.onEvent(PowerPointToPdfUiEvent.SelectSlidesPerPage(count)) },
                                         label = if (count == 1) "1 (Full)" else "$count Slides"
                                     )
                                 }
@@ -186,7 +186,7 @@ fun PowerPointToPdfScreen(
                         DocuConsentCard(
                             hasConsented = uiState.hasConsentedToBackend,
                             onConsentChanged = { viewModel.onEvent(PowerPointToPdfUiEvent.SetConsent(it)) },
-                            backendBaseUrl = uiState.backendBaseUrl
+                            formatName = "PowerPoint presentation"
                         )
                     }
 

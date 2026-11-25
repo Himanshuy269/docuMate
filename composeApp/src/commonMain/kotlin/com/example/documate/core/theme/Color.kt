@@ -58,6 +58,7 @@ val DocuError = Color(0xFFEF4444)
 val DocuWarning = Color(0xFFF59E0B)
 
 // Tool Category Specific Card Colors
+val DocuPdfRed = Color(0xFFE11D48)
 val DocuPdfPurple = Color(0xFF5B4FE1)
 val DocuImageBlue = Color(0xFF4F46E5)
 val DocuAddImagePurple = Color(0xFF9333EA)

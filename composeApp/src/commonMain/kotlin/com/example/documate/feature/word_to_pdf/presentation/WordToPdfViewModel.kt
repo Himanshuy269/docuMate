@@ -3,6 +3,7 @@ package com.example.documate.feature.word_to_pdf.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.documate.core.common.AppResult
+import com.example.documate.core.di.AppContainerHolder
 import com.example.documate.core.domain.model.DocumentFile
 import com.example.documate.core.domain.model.PlatformFile
 import com.example.documate.core.domain.repository.DocumentRepository
@@ -82,10 +83,16 @@ class WordToPdfViewModel(
                 )
             }
 
+            val backendUrl = if (AppContainerHolder.isInitialized) {
+                AppContainerHolder.current.settingsRepository.getSettingsSync().backendServiceUrl
+            } else {
+                "http://10.0.2.2:8080"
+            }
+
             val result = convertWordToPdfUseCase(
                 sourceFile = state.selectedFile,
                 hasUserConsented = state.hasConsentedToBackend,
-                backendBaseUrl = state.backendBaseUrl,
+                backendBaseUrl = backendUrl,
                 preserveHyperlinks = state.preserveHyperlinks,
                 customOutputName = state.outputFileName,
                 onProgress = { p, status ->

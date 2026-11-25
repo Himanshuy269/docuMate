@@ -38,7 +38,9 @@ class AndroidOfficeConversionRepository(
         authToken: String?,
         options: OfficeConversionOptions,
         onProgress: (Float) -> Unit
-    ): AppResult<PlatformFile> = withContext(Dispatchers.IO) { val realSource = File(realSource.path); if (!realSource.exists() || realSource.length() == 0L) {
+    ): AppResult<PlatformFile> = withContext(Dispatchers.IO) {
+        val realSource = File(sourceFile.path)
+        if (!realSource.exists() || realSource.length() == 0L) {
             return@withContext AppResult.Error("Source document does not exist or is empty")
         }
 
@@ -67,12 +69,12 @@ class AndroidOfficeConversionRepository(
             onProgress(0.30f)
 
             // 1. Attempt remote LibreOffice conversion first if backend URL is provided
-            var conversionSuccess = tryRemoteConversion(realSource, backendBaseUrl, outputFile, onProgress)
+            var conversionSuccess = tryRemoteConversion(sourceFile, backendBaseUrl, outputFile, onProgress)
 
             // 2. Fall back to on-device native OpenXML layout rendering
             if (!conversionSuccess) {
                 conversionSuccess = try {
-                    renderNativeOfficePdf(realSource, tool, options, outputFile, onProgress)
+                    renderNativeOfficePdf(sourceFile, tool, options, outputFile, onProgress)
                 } catch (e: Throwable) {
                     false
                 }
@@ -80,7 +82,7 @@ class AndroidOfficeConversionRepository(
 
             // 3. Fallback standard valid PDF generation ensuring compatibility even in JVM test harnesses
             if (!conversionSuccess) {
-                writeFallbackPdf(realSource, tool, options, outputFile)
+                writeFallbackPdf(sourceFile, tool, options, outputFile)
             }
 
             onProgress(1.0f)
@@ -134,6 +136,7 @@ class AndroidOfficeConversionRepository(
         outputFile: File,
         onProgress: (Float) -> Unit
     ): Boolean {
+        val realSource = File(sourceFile.path)
         if (backendBaseUrl.isBlank() || (!backendBaseUrl.startsWith("http://") && !backendBaseUrl.startsWith("https://"))) {
             return false
         }
@@ -205,6 +208,7 @@ class AndroidOfficeConversionRepository(
         outputFile: File,
         onProgress: (Float) -> Unit
     ): Boolean {
+        val realSource = File(sourceFile.path)
         val pdfDocument = PdfDocument()
         try {
             when (tool) {
@@ -231,7 +235,7 @@ class AndroidOfficeConversionRepository(
 
     // --- WORD TO PDF ENGINE ---
     private fun renderWordDocument(
-        sourceFile: PlatformFile,
+        sourceFile: File,
         options: OfficeConversionOptions,
         pdfDocument: PdfDocument,
         onProgress: (Float) -> Unit
@@ -241,9 +245,9 @@ class AndroidOfficeConversionRepository(
             extractedParagraphs
         } else {
             listOf(
-                "Document: ${realSource.name}",
+                "Document: ${sourceFile.name}",
                 "Converted with DocuMate Word-to-PDF Engine.",
-                "Source file size: ${realSource.length() / 1024} KB.",
+                "Source file size: ${sourceFile.length() / 1024} KB.",
                 "Original formatting, paragraphs, headers, and hyperlinks have been processed.",
                 if (options.preserveHyperlinks) "Active hyperlinks preserved in document metadata." else "Hyperlinks converted to plain text."
             )
@@ -290,7 +294,7 @@ class AndroidOfficeConversionRepository(
         var y = margin + 30f
 
         // Document Header
-        val docTitle = realSource.nameWithoutExtension.replace('_', ' ')
+        val docTitle = sourceFile.nameWithoutExtension.replace('_', ' ')
         canvas.drawText(docTitle, margin, y, titlePaint)
         y += 24f
 
@@ -358,7 +362,7 @@ class AndroidOfficeConversionRepository(
 
     // --- EXCEL TO PDF ENGINE ---
     private fun renderExcelDocument(
-        sourceFile: PlatformFile,
+        sourceFile: File,
         options: OfficeConversionOptions,
         pdfDocument: PdfDocument,
         onProgress: (Float) -> Unit
@@ -425,7 +429,7 @@ class AndroidOfficeConversionRepository(
         }
 
         var y = margin + 20f
-        canvas.drawText("Workbook: ${realSource.nameWithoutExtension}", margin, y, titlePaint)
+        canvas.drawText("Workbook: ${sourceFile.nameWithoutExtension}", margin, y, titlePaint)
         y += 20f
 
         val columnCount = tableData.maxOfOrNull { it.size }?.coerceAtLeast(1) ?: 6
@@ -482,7 +486,7 @@ class AndroidOfficeConversionRepository(
 
     // --- POWERPOINT TO PDF ENGINE ---
     private fun renderPowerPointDocument(
-        sourceFile: PlatformFile,
+        sourceFile: File,
         options: OfficeConversionOptions,
         pdfDocument: PdfDocument,
         onProgress: (Float) -> Unit
@@ -492,7 +496,7 @@ class AndroidOfficeConversionRepository(
             extractedSlides
         } else {
             listOf(
-                SlideContent("DocuMate Presentation", listOf("Converted from ${realSource.name}", "Native high-fidelity vector rendering", "Slide decks, layouts, and shapes")),
+                SlideContent("DocuMate Presentation", listOf("Converted from ${sourceFile.name}", "Native high-fidelity vector rendering", "Slide decks, layouts, and shapes")),
                 SlideContent("Executive Summary", listOf("Unified mobile document platform", "Local first, memory-safe architecture", "Seamless cloud LibreOffice bridge option")),
                 SlideContent("Technical Capabilities", listOf("Two-pass subsampled memory decoder", "Lossless JPEG image stream compression", "SAF scoped storage integration")),
                 SlideContent("Conclusion & Next Steps", listOf("Enterprise-grade PDF creation", "Ready for sharing, printing, and archiving"))
@@ -615,7 +619,7 @@ class AndroidOfficeConversionRepository(
                 }
             }
 
-            canvas.drawText("Slide Deck: ${realSource.nameWithoutExtension}  •  Page ${pageIdx + 1} of ${chunks.size}", margin, pageHeight - margin + 14f, footerPaint)
+            canvas.drawText("Slide Deck: ${sourceFile.nameWithoutExtension}  •  Page ${pageIdx + 1} of ${chunks.size}", margin, pageHeight - margin + 14f, footerPaint)
             pdfDocument.finishPage(page)
             onProgress(0.35f + 0.55f * (pageIdx + 1) / chunks.size)
         }
@@ -629,16 +633,17 @@ class AndroidOfficeConversionRepository(
         outputFile: File
     ) {
         // Construct a standard compliant, minimal valid PDF 1.4 stream
+        val nameWithoutExt = sourceFile.name.substringBeforeLast('.')
         val contentStream = StringBuilder()
         contentStream.append("BT\n")
         contentStream.append("/F1 18 Tf\n")
         contentStream.append("50 750 Td\n")
-        contentStream.append("(${tool.title}: ${realSource.nameWithoutExtension}) Tj\n")
+        contentStream.append("(${tool.title}: $nameWithoutExt) Tj\n")
         contentStream.append("/F1 11 Tf\n")
         contentStream.append("0 -30 Td\n")
         contentStream.append("(Converted via DocuMate Clean Architecture Pipeline) Tj\n")
         contentStream.append("0 -20 Td\n")
-        contentStream.append("(Original File: ${realSource.name} | Size: ${realSource.length()} bytes) Tj\n")
+        contentStream.append("(Original File: ${sourceFile.name} | Size: ${sourceFile.sizeBytes} bytes) Tj\n")
         if (tool == DocumentTool.POWERPOINT_TO_PDF) {
             contentStream.append("0 -20 Td\n")
             contentStream.append("(Slides Per Page: ${options.slidesPerPage}) Tj\n")

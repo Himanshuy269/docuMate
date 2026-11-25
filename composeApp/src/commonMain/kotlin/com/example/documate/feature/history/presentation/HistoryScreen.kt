@@ -559,7 +559,7 @@ private fun HistoryRecordItem(
     var isMenuOpen by remember { mutableStateOf(false) }
 
     val (badgeText, badgeTextColor, badgeBgColor, isDownloadIcon) = when (record.tool) {
-        DocumentTool.COMPRESS_PDF -> Quadruple(null, Color(0xFF8B5CF6), Color(0xFFF3E8FF), true)
+        DocumentTool.PDF_COMPRESSION -> Quadruple(null, Color(0xFF8B5CF6), Color(0xFFF3E8FF), true)
         DocumentTool.IMAGES_TO_PDF, DocumentTool.ADD_IMAGES_TO_PDF -> Quadruple("IMG", Color(0xFF3B82F6), Color(0xFFEEF2FF), false)
         DocumentTool.EXCEL_TO_PDF -> Quadruple("XLS", Color(0xFF10B981), Color(0xFFECFDF5), false)
         DocumentTool.WORD_TO_PDF -> Quadruple("DOC", Color(0xFF3B82F6), Color(0xFFEFF6FF), false)
@@ -567,7 +567,7 @@ private fun HistoryRecordItem(
     }
 
     val subtitle = when (record.tool) {
-        DocumentTool.COMPRESS_PDF -> {
+        DocumentTool.PDF_COMPRESSION -> {
             val inMb = formatFileSize(record.inputSizeBytes)
             val outKb = formatFileSize(record.outputSizeBytes)
             "Compressed · $inMb \u2192 $outKb"

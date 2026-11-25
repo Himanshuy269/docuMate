@@ -66,7 +66,7 @@ fun ImagesToPdfScreen(
     val platformActions = rememberPlatformActions()
 
     val pickImages = rememberPlatformFilePicker(
-        mimeType = "image/*",
+        allowedExtensions = listOf("jpg", "jpeg", "png", "webp"),
         allowMultiple = true
     ) { files ->
         if (files.isNotEmpty()) {

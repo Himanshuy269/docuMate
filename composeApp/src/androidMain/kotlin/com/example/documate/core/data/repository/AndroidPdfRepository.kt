@@ -248,7 +248,7 @@ class AndroidPdfRepository(
             for (imageFile in imageFiles) {
                 val added = renderImagePageToDocument(
                     pdfDocument = pdfDocument,
-                    imageFile = imageFile,
+                    imageFile = File(imageFile.path),
                     targetPageNumber = newPageNumber,
                     defaultWidth = defaultWidth,
                     defaultHeight = defaultHeight,

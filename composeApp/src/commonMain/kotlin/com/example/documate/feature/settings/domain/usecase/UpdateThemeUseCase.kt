@@ -2,7 +2,7 @@ package com.example.documate.feature.settings.domain.usecase
 
 import com.example.documate.core.common.AppResult
 import com.example.documate.core.domain.repository.SettingsRepository
-import com.example.documate.feature.settings.presentation.AppThemeMode
+import com.example.documate.core.domain.model.AppThemeMode
 
 /**
  * UseCase to update the application visual theme preference.

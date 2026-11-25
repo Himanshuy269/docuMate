@@ -1,5 +1,6 @@
 package com.example.documate.feature.settings.presentation
 
+import com.example.documate.core.domain.model.AppThemeMode
 import com.example.documate.core.domain.model.CompressionPreset
 import com.example.documate.core.domain.model.PdfPageSize
 

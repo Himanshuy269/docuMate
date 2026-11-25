@@ -1,14 +1,9 @@
 package com.example.documate.feature.settings.presentation
 
 import com.example.documate.core.common.formatFileSize
+import com.example.documate.core.domain.model.AppThemeMode
 import com.example.documate.core.domain.model.CompressionPreset
 import com.example.documate.core.domain.model.PdfPageSize
-
-enum class AppThemeMode(val title: String) {
-    SYSTEM("System Default"),
-    LIGHT("Light Theme"),
-    DARK("Dark Theme")
-}
 
 data class SettingsUiState(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,

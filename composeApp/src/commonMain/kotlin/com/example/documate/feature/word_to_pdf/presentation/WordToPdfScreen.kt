@@ -54,7 +54,7 @@ fun WordToPdfScreen(
     val platformActions = rememberPlatformActions()
 
     val pickWordFile = rememberPlatformFilePicker(
-        mimeType = "*/*"
+        allowedExtensions = listOf("docx", "doc")
     ) { files ->
         files.firstOrNull()?.let {
             viewModel.onEvent(WordToPdfUiEvent.SelectFile(it.uriString))
@@ -193,7 +193,7 @@ fun WordToPdfScreen(
                         DocuConsentCard(
                             hasConsented = uiState.hasConsentedToBackend,
                             onConsentChanged = { viewModel.onEvent(WordToPdfUiEvent.SetConsent(it)) },
-                            backendBaseUrl = uiState.backendBaseUrl
+                            formatName = "Word document"
                         )
                     }
 

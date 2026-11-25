@@ -15,12 +15,17 @@ data class HistoryUiState(
     val records: List<ConversionRecord> = emptyList(),
     val searchQuery: String = "",
     val selectedTab: HistoryFilterTab = HistoryFilterTab.ALL,
+    val selectedFilter: ToolCategory? = null,
     val selectedToolFilter: DocumentTool? = null,
     val isSearchBarVisible: Boolean = false,
     val isClearHistoryDialogVisible: Boolean = false,
     val pendingDeleteRecordId: String? = null,
-    val snackbarMessage: String? = null
+    val errorMessage: String? = null
 ) {
+    val isConfirmClearDialogOpen: Boolean get() = isClearHistoryDialogVisible
+    val filesCreatedCount: Int get() = records.size
+    val spaceSavedFormatted: String get() = formattedTotalStorageSaved
+
     val filteredRecords: List<ConversionRecord>
         get() = records.filter { record ->
             val matchesSearch = searchQuery.isBlank() ||
@@ -30,13 +35,14 @@ data class HistoryUiState(
             val matchesTab = when (selectedTab) {
                 HistoryFilterTab.ALL -> true
                 HistoryFilterTab.IMAGES -> record.tool == DocumentTool.IMAGES_TO_PDF || record.tool == DocumentTool.ADD_IMAGES_TO_PDF
-                HistoryFilterTab.DOCUMENTS -> record.tool.category == ToolCategory.OFFICE_TO_PDF
-                HistoryFilterTab.COMPRESSED -> record.tool == DocumentTool.PDF_COMPRESSOR
+                HistoryFilterTab.DOCUMENTS -> record.tool.category == ToolCategory.OFFICE
+                HistoryFilterTab.COMPRESSED -> record.tool == DocumentTool.PDF_COMPRESSION
             }
 
+            val matchesFilter = selectedFilter == null || record.tool.category == selectedFilter
             val matchesTool = selectedToolFilter == null || record.tool == selectedToolFilter
 
-            matchesSearch && matchesTab && matchesTool
+            matchesSearch && matchesTab && matchesFilter && matchesTool
         }
 
     val totalConversionsCount: Int

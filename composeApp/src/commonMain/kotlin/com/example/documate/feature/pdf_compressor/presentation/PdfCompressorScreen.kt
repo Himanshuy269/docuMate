@@ -58,7 +58,7 @@ fun PdfCompressorScreen(
     val platformActions = rememberPlatformActions()
 
     val pickPdf = rememberPlatformFilePicker(
-        mimeType = "application/pdf"
+        allowedExtensions = listOf("pdf")
     ) { files ->
         files.firstOrNull()?.let {
             viewModel.onEvent(PdfCompressorUiEvent.SelectPdf(it.uriString))
@@ -183,7 +183,7 @@ fun PdfCompressorScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = preset.displayName,
+                                            text = preset.title,
                                             style = MaterialTheme.typography.titleSmall
                                         )
                                         Text(

@@ -4,7 +4,7 @@ import com.example.documate.core.common.AppResult
 import com.example.documate.core.domain.model.CompressionPreset
 import com.example.documate.core.domain.model.PdfPageSize
 import com.example.documate.core.domain.model.UserSettings
-import com.example.documate.feature.settings.presentation.AppThemeMode
+import com.example.documate.core.domain.model.AppThemeMode
 import kotlinx.coroutines.flow.Flow
 
 /**

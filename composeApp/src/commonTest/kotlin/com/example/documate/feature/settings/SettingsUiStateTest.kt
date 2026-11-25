@@ -2,7 +2,7 @@ package com.example.documate.feature.settings
 
 import com.example.documate.core.domain.model.CompressionPreset
 import com.example.documate.core.domain.model.PdfPageSize
-import com.example.documate.feature.settings.presentation.AppThemeMode
+import com.example.documate.core.domain.model.AppThemeMode
 import com.example.documate.feature.settings.presentation.SettingsUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

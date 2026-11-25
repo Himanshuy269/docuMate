@@ -3,6 +3,7 @@ package com.example.documate.feature.powerpoint_to_pdf.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.documate.core.common.AppResult
+import com.example.documate.core.di.AppContainerHolder
 import com.example.documate.core.domain.model.DocumentFile
 import com.example.documate.core.domain.model.PlatformFile
 import com.example.documate.core.domain.repository.DocumentRepository
@@ -29,7 +30,7 @@ class PowerPointToPdfViewModel(
             is PowerPointToPdfUiEvent.SelectFile -> handleSelectFile(event.uriString)
             is PowerPointToPdfUiEvent.RemoveFile -> _uiState.update { it.copy(selectedFile = null, outputFileName = "") }
             is PowerPointToPdfUiEvent.SetConsent -> _uiState.update { it.copy(hasConsentedToBackend = event.consented) }
-            is PowerPointToPdfUiEvent.UpdateSlidesPerPage -> _uiState.update { it.copy(slidesPerPage = event.count) }
+            is PowerPointToPdfUiEvent.SelectSlidesPerPage -> _uiState.update { it.copy(slidesPerPage = event.count) }
             is PowerPointToPdfUiEvent.UpdateOutputFileName -> _uiState.update { it.copy(outputFileName = event.name) }
             is PowerPointToPdfUiEvent.StartConversion -> handleStartConversion()
             is PowerPointToPdfUiEvent.CancelConversion -> handleCancelConversion()
@@ -82,10 +83,16 @@ class PowerPointToPdfViewModel(
                 )
             }
 
+            val backendUrl = if (AppContainerHolder.isInitialized) {
+                AppContainerHolder.current.settingsRepository.getSettingsSync().backendServiceUrl
+            } else {
+                "http://10.0.2.2:8080"
+            }
+
             val result = convertPowerPointToPdfUseCase(
                 sourceFile = state.selectedFile,
                 hasUserConsented = state.hasConsentedToBackend,
-                backendBaseUrl = state.backendBaseUrl,
+                backendBaseUrl = backendUrl,
                 slidesPerPage = state.slidesPerPage,
                 customOutputName = state.outputFileName,
                 onProgress = { p, status ->

@@ -11,7 +11,7 @@ import com.example.documate.feature.settings.domain.usecase.UpdateBackendUrlUseC
 import com.example.documate.feature.settings.domain.usecase.UpdateDefaultCompressionUseCase
 import com.example.documate.feature.settings.domain.usecase.UpdateDefaultPageSizeUseCase
 import com.example.documate.feature.settings.domain.usecase.UpdateThemeUseCase
-import com.example.documate.feature.settings.presentation.AppThemeMode
+import com.example.documate.core.domain.model.AppThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow

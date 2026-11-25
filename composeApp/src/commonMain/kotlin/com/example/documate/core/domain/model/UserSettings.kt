@@ -1,6 +1,10 @@
 package com.example.documate.core.domain.model
 
-import com.example.documate.feature.settings.presentation.AppThemeMode
+enum class AppThemeMode(val title: String) {
+    SYSTEM("System Default"),
+    LIGHT("Light Theme"),
+    DARK("Dark Theme")
+}
 
 /**
  * Domain model representing persisted user preferences and configuration.

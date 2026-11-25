@@ -263,7 +263,7 @@ class OfficeToPdfEdgeCasesTest {
     private class MockSettingsRepository : SettingsRepository {
         override fun getSettings(): Flow<UserSettings> = flowOf(UserSettings())
         override fun getSettingsSync(): UserSettings = UserSettings()
-        override suspend fun updateTheme(themeMode: com.example.documate.feature.settings.presentation.AppThemeMode): AppResult<Unit> = AppResult.Success(Unit)
+        override suspend fun updateTheme(themeMode: com.example.documate.core.domain.model.AppThemeMode): AppResult<Unit> = AppResult.Success(Unit)
         override suspend fun updateDefaultPageSize(pageSize: com.example.documate.core.domain.model.PdfPageSize): AppResult<Unit> = AppResult.Success(Unit)
         override suspend fun updateDefaultCompression(preset: com.example.documate.core.domain.model.CompressionPreset): AppResult<Unit> = AppResult.Success(Unit)
         override suspend fun updateBackendUrl(url: String): AppResult<Unit> = AppResult.Success(Unit)

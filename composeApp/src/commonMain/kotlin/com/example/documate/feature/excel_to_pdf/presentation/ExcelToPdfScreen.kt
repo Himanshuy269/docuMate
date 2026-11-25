@@ -54,7 +54,7 @@ fun ExcelToPdfScreen(
     val platformActions = rememberPlatformActions()
 
     val pickExcelFile = rememberPlatformFilePicker(
-        mimeType = "*/*"
+        allowedExtensions = listOf("xlsx", "xls")
     ) { files ->
         files.firstOrNull()?.let {
             viewModel.onEvent(ExcelToPdfUiEvent.SelectFile(it.uriString))
@@ -171,7 +171,7 @@ fun ExcelToPdfScreen(
                                 }
                                 Switch(
                                     checked = uiState.fitToPageWidth,
-                                    onCheckedChange = { viewModel.onEvent(ExcelToPdfUiEvent.ToggleFitToPage(it)) },
+                                    onCheckedChange = { viewModel.onEvent(ExcelToPdfUiEvent.ToggleFitToWidth(it)) },
                                     colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
                                 )
                             }
@@ -193,7 +193,7 @@ fun ExcelToPdfScreen(
                         DocuConsentCard(
                             hasConsented = uiState.hasConsentedToBackend,
                             onConsentChanged = { viewModel.onEvent(ExcelToPdfUiEvent.SetConsent(it)) },
-                            backendBaseUrl = uiState.backendBaseUrl
+                            formatName = "Excel spreadsheet"
                         )
                     }
 

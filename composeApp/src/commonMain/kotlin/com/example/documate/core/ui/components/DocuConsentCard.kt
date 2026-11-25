@@ -20,9 +20,10 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun DocuConsentCard(
-    consented: Boolean,
-    onConsentChange: (Boolean) -> Unit,
-    formatName: String,
+    hasConsented: Boolean,
+    onConsentChanged: (Boolean) -> Unit,
+    formatName: String = "Office document",
+    backendBaseUrl: String = "",
     modifier: Modifier = Modifier
 ) {
     DocuCard(
@@ -49,8 +50,9 @@ fun DocuConsentCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
+            val serverText = if (backendBaseUrl.isNotBlank()) " ($backendBaseUrl)" else ""
             Text(
-                text = "$formatName conversion runs through an isolated LibreOffice backend service. Your document is processed in memory and purged immediately after PDF rendering. It is never stored or logged.",
+                text = "$formatName conversion runs through an isolated LibreOffice backend service$serverText. Your document is processed in memory and purged immediately after PDF rendering. It is never stored or logged.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -62,8 +64,8 @@ fun DocuConsentCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Checkbox(
-                    checked = consented,
-                    onCheckedChange = onConsentChange,
+                    checked = hasConsented,
+                    onCheckedChange = onConsentChanged,
                     colors = CheckboxDefaults.colors(
                         checkedColor = MaterialTheme.colorScheme.primary
                     )
