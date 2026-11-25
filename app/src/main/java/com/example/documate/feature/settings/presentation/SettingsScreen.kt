@@ -9,13 +9,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -23,6 +33,7 @@ import com.example.documate.core.domain.model.CompressionPreset
 import com.example.documate.core.domain.model.PdfPageSize
 import com.example.documate.core.ui.AppViewModelProvider
 import com.example.documate.core.ui.components.DocuCard
+import com.example.documate.core.ui.components.DocuConfirmDialog
 import com.example.documate.core.ui.components.DocuFilterChip
 import com.example.documate.core.ui.components.DocuSectionHeader
 import com.example.documate.core.ui.components.DocuTopAppBar
@@ -34,6 +45,25 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.statusMessage) {
+        uiState.statusMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.onEvent(SettingsUiEvent.DismissStatusMessage)
+        }
+    }
+
+    if (uiState.isConfirmClearCacheVisible) {
+        DocuConfirmDialog(
+            title = "Clear Temporary Cache?",
+            message = "This will remove all temporary cached documents and rendering artifacts. Your saved PDFs and history records will remain intact.",
+            confirmButtonText = "Clear Cache",
+            onConfirm = { viewModel.onEvent(SettingsUiEvent.ClearAppCache) },
+            onDismiss = { viewModel.onEvent(SettingsUiEvent.DismissClearCacheConfirmation) },
+            isDestructive = true
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -43,7 +73,8 @@ fun SettingsScreen(
                 canNavigateBack = true,
                 onNavigateBack = onNavigateBack
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -106,6 +137,43 @@ fun SettingsScreen(
                                 onClick = { viewModel.onEvent(SettingsUiEvent.SelectDefaultCompression(preset)) },
                                 label = preset.title.substringBefore(" ")
                             )
+                        }
+                    }
+                }
+            }
+
+            // Storage and Cache
+            item {
+                DocuSectionHeader(title = "Storage & Cache")
+                DocuCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Temporary Cache",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                            Text(
+                                text = "Current usage: ${uiState.formattedCacheSize}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { viewModel.onEvent(SettingsUiEvent.ShowClearCacheConfirmation) },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CleaningServices,
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 6.dp)
+                            )
+                            Text("Clear")
                         }
                     }
                 }

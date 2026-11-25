@@ -3,7 +3,12 @@ package com.example.documate.feature.settings.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.documate.core.common.AppResult
-import com.example.documate.core.domain.repository.SettingsRepository
+import com.example.documate.feature.settings.domain.usecase.GetSettingsUseCase
+import com.example.documate.feature.settings.domain.usecase.ManageAppCacheUseCase
+import com.example.documate.feature.settings.domain.usecase.UpdateBackendUrlUseCase
+import com.example.documate.feature.settings.domain.usecase.UpdateDefaultCompressionUseCase
+import com.example.documate.feature.settings.domain.usecase.UpdateDefaultPageSizeUseCase
+import com.example.documate.feature.settings.domain.usecase.UpdateThemeUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,7 +16,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(
-    private val settingsRepository: SettingsRepository
+    private val getSettingsUseCase: GetSettingsUseCase,
+    private val updateThemeUseCase: UpdateThemeUseCase,
+    private val updateDefaultPageSizeUseCase: UpdateDefaultPageSizeUseCase,
+    private val updateDefaultCompressionUseCase: UpdateDefaultCompressionUseCase,
+    private val updateBackendUrlUseCase: UpdateBackendUrlUseCase,
+    private val manageAppCacheUseCase: ManageAppCacheUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -23,8 +33,8 @@ class SettingsViewModel(
 
     private fun loadSettingsAndCache() {
         viewModelScope.launch {
-            val currentSettings = settingsRepository.getSettingsSync()
-            val cacheBytes = settingsRepository.getAppCacheSizeBytes()
+            val currentSettings = getSettingsUseCase.getSync()
+            val cacheBytes = manageAppCacheUseCase.getCacheSizeBytes()
             _uiState.update {
                 it.copy(
                     themeMode = currentSettings.themeMode,
@@ -35,7 +45,7 @@ class SettingsViewModel(
                 )
             }
 
-            settingsRepository.getSettings().collect { userSettings ->
+            getSettingsUseCase().collect { userSettings ->
                 _uiState.update {
                     it.copy(
                         themeMode = userSettings.themeMode,
@@ -52,22 +62,34 @@ class SettingsViewModel(
         when (event) {
             is SettingsUiEvent.SelectTheme -> {
                 viewModelScope.launch {
-                    settingsRepository.updateTheme(event.theme)
+                    when (val result = updateThemeUseCase(event.theme)) {
+                        is AppResult.Error -> _uiState.update { it.copy(statusMessage = result.message) }
+                        else -> {}
+                    }
                 }
             }
             is SettingsUiEvent.SelectDefaultPageSize -> {
                 viewModelScope.launch {
-                    settingsRepository.updateDefaultPageSize(event.size)
+                    when (val result = updateDefaultPageSizeUseCase(event.size)) {
+                        is AppResult.Error -> _uiState.update { it.copy(statusMessage = result.message) }
+                        else -> {}
+                    }
                 }
             }
             is SettingsUiEvent.SelectDefaultCompression -> {
                 viewModelScope.launch {
-                    settingsRepository.updateDefaultCompression(event.preset)
+                    when (val result = updateDefaultCompressionUseCase(event.preset)) {
+                        is AppResult.Error -> _uiState.update { it.copy(statusMessage = result.message) }
+                        else -> {}
+                    }
                 }
             }
             is SettingsUiEvent.UpdateBackendUrl -> {
                 viewModelScope.launch {
-                    settingsRepository.updateBackendUrl(event.url)
+                    when (val result = updateBackendUrlUseCase(event.url)) {
+                        is AppResult.Error -> _uiState.update { it.copy(statusMessage = result.message) }
+                        else -> {}
+                    }
                 }
             }
             is SettingsUiEvent.ShowClearCacheConfirmation -> {
@@ -78,9 +100,9 @@ class SettingsViewModel(
             }
             is SettingsUiEvent.ClearAppCache -> {
                 viewModelScope.launch {
-                    when (val result = settingsRepository.clearAppCache()) {
+                    when (val result = manageAppCacheUseCase.clearCache()) {
                         is AppResult.Success -> {
-                            val updatedSize = settingsRepository.getAppCacheSizeBytes()
+                            val updatedSize = manageAppCacheUseCase.getCacheSizeBytes()
                             _uiState.update {
                                 it.copy(
                                     isConfirmClearCacheVisible = false,

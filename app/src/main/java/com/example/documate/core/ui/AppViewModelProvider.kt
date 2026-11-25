@@ -16,7 +16,7 @@ import com.example.documate.feature.settings.presentation.SettingsViewModel
 import com.example.documate.feature.word_to_pdf.presentation.WordToPdfViewModel
 
 /**
- * Factory provider providing ViewModels with their required repository dependencies
+ * Factory provider providing ViewModels with their required dependencies
  * from the application container.
  */
 object AppViewModelProvider {
@@ -27,11 +27,22 @@ object AppViewModelProvider {
         }
         initializer {
             val app = docuMateApplication()
-            HistoryViewModel(app.container.historyRepository)
+            HistoryViewModel(
+                getConversionHistoryUseCase = app.container.getConversionHistoryUseCase,
+                deleteHistoryRecordUseCase = app.container.deleteHistoryRecordUseCase,
+                clearHistoryUseCase = app.container.clearHistoryUseCase
+            )
         }
         initializer {
             val app = docuMateApplication()
-            SettingsViewModel(app.container.settingsRepository)
+            SettingsViewModel(
+                getSettingsUseCase = app.container.getSettingsUseCase,
+                updateThemeUseCase = app.container.updateThemeUseCase,
+                updateDefaultPageSizeUseCase = app.container.updateDefaultPageSizeUseCase,
+                updateDefaultCompressionUseCase = app.container.updateDefaultCompressionUseCase,
+                updateBackendUrlUseCase = app.container.updateBackendUrlUseCase,
+                manageAppCacheUseCase = app.container.manageAppCacheUseCase
+            )
         }
         initializer {
             val app = docuMateApplication()

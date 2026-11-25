@@ -2,18 +2,22 @@ package com.example.documate.feature.history.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.documate.core.common.AppResult
 import com.example.documate.core.domain.model.ToolCategory
-import com.example.documate.core.domain.repository.HistoryRepository
+import com.example.documate.feature.history.domain.usecase.ClearHistoryUseCase
+import com.example.documate.feature.history.domain.usecase.DeleteHistoryRecordUseCase
+import com.example.documate.feature.history.domain.usecase.GetConversionHistoryUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class HistoryViewModel(
-    private val historyRepository: HistoryRepository
+    private val getConversionHistoryUseCase: GetConversionHistoryUseCase,
+    private val deleteHistoryRecordUseCase: DeleteHistoryRecordUseCase,
+    private val clearHistoryUseCase: ClearHistoryUseCase
 ) : ViewModel() {
 
     private val _selectedFilter = MutableStateFlow<ToolCategory?>(null)
@@ -21,7 +25,7 @@ class HistoryViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<HistoryUiState> = combine(
-        historyRepository.getRecentConversions(),
+        getConversionHistoryUseCase(),
         _selectedFilter,
         _isConfirmDialogOpen,
         _errorMessage
@@ -51,14 +55,23 @@ class HistoryViewModel(
 
     private fun handleDeleteRecord(id: String) {
         viewModelScope.launch {
-            historyRepository.deleteRecord(id)
+            when (val result = deleteHistoryRecordUseCase(id)) {
+                is AppResult.Error -> _errorMessage.value = result.message
+                else -> {}
+            }
         }
     }
 
     private fun handleClearAll() {
         viewModelScope.launch {
-            historyRepository.clearAll()
-            _isConfirmDialogOpen.value = false
+            when (val result = clearHistoryUseCase()) {
+                is AppResult.Success -> _isConfirmDialogOpen.value = false
+                is AppResult.Error -> {
+                    _errorMessage.value = result.message
+                    _isConfirmDialogOpen.value = false
+                }
+                else -> _isConfirmDialogOpen.value = false
+            }
         }
     }
 }

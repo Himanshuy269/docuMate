@@ -1,7 +1,9 @@
 package com.example.documate.feature.history.presentation
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,16 +27,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.documate.core.domain.model.ConversionRecord
 import com.example.documate.core.domain.model.ToolCategory
@@ -57,6 +64,14 @@ fun HistoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.onEvent(HistoryUiEvent.ClearError)
+        }
+    }
 
     if (uiState.isConfirmClearDialogOpen) {
         DocuConfirmDialog(
@@ -87,7 +102,8 @@ fun HistoryScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -143,20 +159,44 @@ fun HistoryScreen(
                             record = record,
                             onPreview = {
                                 val file = File(record.outputPath)
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(Uri.fromFile(file), "application/pdf")
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                if (!file.exists()) {
+                                    Toast.makeText(context, "File no longer exists on disk", Toast.LENGTH_SHORT).show()
+                                    return@HistoryRecordCard
                                 }
-                                context.startActivity(Intent.createChooser(intent, "Open PDF"))
+                                try {
+                                    val authority = "${context.packageName}.fileprovider"
+                                    val uri = FileProvider.getUriForFile(context, authority, file)
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(uri, "application/pdf")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, "Open PDF"))
+                                } catch (_: ActivityNotFoundException) {
+                                    Toast.makeText(context, "No PDF viewer application found", Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Unable to open file: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             onShare = {
                                 val file = File(record.outputPath)
-                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/pdf"
-                                    putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file))
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                if (!file.exists()) {
+                                    Toast.makeText(context, "File no longer exists on disk", Toast.LENGTH_SHORT).show()
+                                    return@HistoryRecordCard
                                 }
-                                context.startActivity(Intent.createChooser(intent, "Share PDF"))
+                                try {
+                                    val authority = "${context.packageName}.fileprovider"
+                                    val uri = FileProvider.getUriForFile(context, authority, file)
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/pdf"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, "Share PDF"))
+                                } catch (_: ActivityNotFoundException) {
+                                    Toast.makeText(context, "No sharing application found", Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Unable to share file: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             onDelete = {
                                 viewModel.onEvent(HistoryUiEvent.DeleteRecord(record.id))

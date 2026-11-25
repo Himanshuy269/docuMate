@@ -2,6 +2,7 @@ package com.example.documate.feature.settings.presentation
 
 import com.example.documate.core.domain.model.CompressionPreset
 import com.example.documate.core.domain.model.PdfPageSize
+import java.util.Locale
 
 enum class AppThemeMode(val title: String) {
     SYSTEM("System Default"),
@@ -21,8 +22,15 @@ data class SettingsUiState(
 ) {
     val formattedCacheSize: String
         get() = when {
-            cacheSizeBytes <= 0 -> "0 KB"
-            cacheSizeBytes < 1024 * 1024 -> String.format("%.1f KB", cacheSizeBytes / 1024.0)
-            else -> String.format("%.2f MB", cacheSizeBytes / (1024.0 * 1024.0))
+            cacheSizeBytes <= 0L -> "0 B"
+            cacheSizeBytes < 1024L -> "$cacheSizeBytes B"
+            cacheSizeBytes < 1024L * 1024L -> {
+                val kb = cacheSizeBytes / 1024.0
+                if (kb % 1.0 == 0.0) "${kb.toLong()} KB" else String.format(Locale.US, "%.1f KB", kb)
+            }
+            else -> {
+                val mb = cacheSizeBytes / (1024.0 * 1024.0)
+                if (mb % 1.0 == 0.0) "${mb.toLong()} MB" else String.format(Locale.US, "%.1f MB", mb)
+            }
         }
 }
