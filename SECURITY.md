@@ -55,7 +55,15 @@ DocuMate strictly abides by Android's Scoped Storage guidelines:
 
 ---
 
-## 4. Network Security & Office Conversion Backend
+## 4. Encryption & Protection Mechanisms
+
+- **At-Rest Protection**: Local documents benefit from Android's hardware-backed **File-Based Encryption (FBE)** (Credential Encrypted storage for post-unlock user files). DocuMate intentionally avoids custom, unverified cryptographic wrappers ("fake encryption") and relies on vetted OS-level cryptographic primitives.
+- **In-Transit Protection**: Network communication with the user's conversion backend enforces **TLS 1.2 / TLS 1.3** encryption. Cleartext HTTP is discouraged in production.
+- **No Illusion of Absolute Security**: DocuMate acknowledges that HTTPS alone does not protect locally stored files if a device's OS-level security is compromised, and neither ProGuard nor R8 makes an Android client application unhackable. Security is achieved through defense-in-depth, least-privilege scoping, and zero data hoarding.
+
+---
+
+## 5. Network Security & Office Conversion Backend
 
 ### Local vs. Remote Separation
 - **Local Features**: Images to PDF, Add Images to PDF, PDF Compression do not utilize network access.
@@ -72,7 +80,7 @@ DocuMate strictly abides by Android's Scoped Storage guidelines:
 
 ---
 
-## 5. Permissions Audit
+## 6. Permissions Audit
 
 DocuMate requests the minimum viable privileges required for its functionality:
 
@@ -85,7 +93,7 @@ DocuMate requests the minimum viable privileges required for its functionality:
 
 ---
 
-## 6. Third-Party Dependencies & Supply Chain Integrity
+## 7. Third-Party Dependencies & Supply Chain Integrity
 
 DocuMate maintains a minimal dependency surface to reduce supply chain attack vectors:
 
@@ -98,7 +106,26 @@ No closed-source commercial analytics, binary ad networks, or invasive SDKs are 
 
 ---
 
-## 7. Vulnerability Disclosure & Reporting
+## 8. Known Limitations
+
+1. **Password-Protected Documents**: Encrypted Office documents or password-locked PDFs cannot be converted without first removing the password.
+2. **Extremely Large Files (> 100 MB)**: Operations on very large documents are bounded by the device's heap allocation limits.
+3. **Complex Macro Execution**: LibreOffice conversion ignores embedded VBA macros to prevent remote code execution vectors.
+
+---
+
+## 9. Security Testing Checklist
+
+- [x] **SAF Verification**: App functions without granting `READ_EXTERNAL_STORAGE` or `WRITE_EXTERNAL_STORAGE`.
+- [x] **FileProvider Path Isolation**: FileProvider only exposes paths within designated application-private subdirectories.
+- [x] **OOM Defense**: 108MP camera photos downsample safely using `inJustDecodeBounds` without throwing `OutOfMemoryError`.
+- [x] **User Consent Enforcement**: Office conversions abort immediately with an error if user consent is not actively toggled.
+- [x] **Backup Exclusion**: `android:allowBackup="false"` verified in `AndroidManifest.xml`.
+- [x] **Cache Eviction**: Scratch files are deleted in `finally` blocks on both success and failure states.
+
+---
+
+## 10. Vulnerability Disclosure & Reporting
 
 We take the security of DocuMate seriously. If you discover a security vulnerability, please report it responsibly:
 
