@@ -26,13 +26,8 @@ class WebHistoryRepository : HistoryRepository {
         return AppResult.Success(Unit)
     }
 
-    override suspend fun clearHistory(): AppResult<Unit> {
+    override suspend fun clearAll(): AppResult<Unit> {
         _records.value = emptyList()
         return AppResult.Success(Unit)
-    }
-
-    override suspend fun getRecordById(id: String): AppResult<ConversionRecord?> {
-        val found = _records.value.find { it.id == id }
-        return AppResult.Success(found)
     }
 }

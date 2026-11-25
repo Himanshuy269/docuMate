@@ -13,6 +13,9 @@ import com.example.documate.feature.history.domain.usecase.DeleteHistoryRecordUs
 import com.example.documate.feature.history.domain.usecase.GetConversionHistoryUseCase
 import com.example.documate.feature.images_to_pdf.domain.usecase.ConvertImagesToPdfUseCase
 import com.example.documate.feature.pdf_compressor.domain.usecase.CompressPdfUseCase
+import com.example.documate.feature.pdf_to_excel.domain.usecase.ConvertPdfToExcelUseCase
+import com.example.documate.feature.pdf_to_powerpoint.domain.usecase.ConvertPdfToPowerPointUseCase
+import com.example.documate.feature.pdf_to_word.domain.usecase.ConvertPdfToWordUseCase
 import com.example.documate.feature.powerpoint_to_pdf.domain.usecase.ConvertPowerPointToPdfUseCase
 import com.example.documate.feature.settings.domain.usecase.GetSettingsUseCase
 import com.example.documate.feature.settings.domain.usecase.ManageAppCacheUseCase
@@ -40,6 +43,9 @@ interface AppContainer {
     val convertWordToPdfUseCase: ConvertWordToPdfUseCase
     val convertExcelToPdfUseCase: ConvertExcelToPdfUseCase
     val convertPowerPointToPdfUseCase: ConvertPowerPointToPdfUseCase
+    val convertPdfToWordUseCase: ConvertPdfToWordUseCase
+    val convertPdfToExcelUseCase: ConvertPdfToExcelUseCase
+    val convertPdfToPowerPointUseCase: ConvertPdfToPowerPointUseCase
 
     // History UseCases
     val getConversionHistoryUseCase: GetConversionHistoryUseCase
@@ -107,6 +113,30 @@ abstract class BaseAppContainer : AppContainer {
 
     override val convertPowerPointToPdfUseCase: ConvertPowerPointToPdfUseCase by lazy {
         ConvertPowerPointToPdfUseCase(
+            documentRepository = documentRepository,
+            officeConversionRepository = officeConversionRepository,
+            historyRepository = historyRepository
+        )
+    }
+
+    override val convertPdfToWordUseCase: ConvertPdfToWordUseCase by lazy {
+        ConvertPdfToWordUseCase(
+            documentRepository = documentRepository,
+            officeConversionRepository = officeConversionRepository,
+            historyRepository = historyRepository
+        )
+    }
+
+    override val convertPdfToExcelUseCase: ConvertPdfToExcelUseCase by lazy {
+        ConvertPdfToExcelUseCase(
+            documentRepository = documentRepository,
+            officeConversionRepository = officeConversionRepository,
+            historyRepository = historyRepository
+        )
+    }
+
+    override val convertPdfToPowerPointUseCase: ConvertPdfToPowerPointUseCase by lazy {
+        ConvertPdfToPowerPointUseCase(
             documentRepository = documentRepository,
             officeConversionRepository = officeConversionRepository,
             historyRepository = historyRepository

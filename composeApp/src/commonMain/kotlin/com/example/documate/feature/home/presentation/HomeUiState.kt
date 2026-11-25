@@ -24,4 +24,7 @@ data class HomeUiState(
 
     val officeTools: List<DocumentTool>
         get() = filteredTools.filter { it.category == ToolCategory.OFFICE }
+
+    val pdfToOfficeTools: List<DocumentTool>
+        get() = filteredTools.filter { it.category == ToolCategory.PDF_TO_OFFICE }
 }

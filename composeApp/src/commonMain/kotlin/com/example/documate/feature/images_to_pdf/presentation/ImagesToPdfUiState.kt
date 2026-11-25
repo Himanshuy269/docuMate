@@ -1,5 +1,6 @@
 package com.example.documate.feature.images_to_pdf.presentation
 
+import com.example.documate.core.common.currentTimeMillis
 import com.example.documate.core.domain.model.DocumentFile
 import com.example.documate.core.domain.model.PdfMargin
 import com.example.documate.core.domain.model.PdfOrientation
@@ -10,7 +11,7 @@ data class ImagesToPdfUiState(
     val pageSize: PdfPageSize = PdfPageSize.A4,
     val orientation: PdfOrientation = PdfOrientation.PORTRAIT,
     val margin: PdfMargin = PdfMargin.NONE,
-    val outputFileName: String = "Images_${System.currentTimeMillis() / 1000}",
+    val outputFileName: String = "Images_${currentTimeMillis() / 1000}",
     val isProcessing: Boolean = false,
     val progress: Float = 0f,
     val statusMessage: String? = null,

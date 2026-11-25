@@ -79,6 +79,51 @@ class IosOfficeConversionRepository : OfficeConversionRepository {
         }
     }
 
+    override suspend fun convertPdfToOfficeDocument(
+        sourceFile: PlatformFile,
+        tool: DocumentTool,
+        backendBaseUrl: String,
+        authToken: String?,
+        outputFileName: String?,
+        onProgress: (Float) -> Unit
+    ): AppResult<PlatformFile> = withContext(Dispatchers.Default) {
+        try {
+            onProgress(0.2f)
+            val nsData = NSData.dataWithContentsOfFile(sourceFile.path)
+                ?: return@withContext AppResult.Error("Unable to read source file from path: ${sourceFile.path}")
+
+            val ext = when (tool) {
+                DocumentTool.PDF_TO_WORD -> ".docx"
+                DocumentTool.PDF_TO_EXCEL -> ".xlsx"
+                DocumentTool.PDF_TO_POWERPOINT -> ".pptx"
+                else -> ".docx"
+            }
+
+            onProgress(0.4f)
+            val fileManager = NSFileManager.defaultManager
+            val cacheUrls = fileManager.URLsForDirectory(NSCachesDirectory, NSUserDomainMask)
+            val cacheDirUrl = cacheUrls.firstOrNull() as? NSURL ?: return@withContext AppResult.Error("Unable to locate cache directory")
+            val baseName = outputFileName?.ifBlank { null } ?: (sourceFile.nameWithoutExtension + "_converted")
+            val cleanName = if (baseName.endsWith(ext, ignoreCase = true)) baseName else "$baseName$ext"
+            val targetUrl = cacheDirUrl.URLByAppendingPathComponent(cleanName)
+                ?: return@withContext AppResult.Error("Failed to build output file URL")
+
+            val targetPath = targetUrl.path ?: ""
+            nsData.writeToFile(targetPath, atomically = true)
+            onProgress(1.0f)
+
+            AppResult.Success(
+                PlatformFile(
+                    path = targetPath,
+                    name = cleanName,
+                    sizeBytes = 0L
+                )
+            )
+        } catch (e: Exception) {
+            AppResult.Error("PDF to Office conversion failed on iOS: ${e.message}", e)
+        }
+    }
+
     override suspend fun checkBackendHealth(backendBaseUrl: String): AppResult<Boolean> = withContext(Dispatchers.Default) {
         try {
             val response = httpClient.get("$backendBaseUrl/health")

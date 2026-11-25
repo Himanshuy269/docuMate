@@ -26,6 +26,9 @@ import com.example.documate.feature.history.presentation.HistoryScreen
 import com.example.documate.feature.home.presentation.HomeScreen
 import com.example.documate.feature.images_to_pdf.presentation.ImagesToPdfScreen
 import com.example.documate.feature.pdf_compressor.presentation.PdfCompressorScreen
+import com.example.documate.feature.pdf_to_excel.presentation.PdfToExcelScreen
+import com.example.documate.feature.pdf_to_powerpoint.presentation.PdfToPowerPointScreen
+import com.example.documate.feature.pdf_to_word.presentation.PdfToWordScreen
 import com.example.documate.feature.powerpoint_to_pdf.presentation.PowerPointToPdfScreen
 import com.example.documate.feature.settings.presentation.SettingsScreen
 import com.example.documate.feature.word_to_pdf.presentation.WordToPdfScreen
@@ -65,8 +68,12 @@ fun DocuNavGraph(
                                 onClick = {
                                     if (currentRoute != item.route) {
                                         navController.navigate(item.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
+                                            val startDest = navController.graph.findStartDestination()
+                                            val startRoute = startDest.route
+                                            if (startRoute != null) {
+                                                popUpTo(startRoute) {
+                                                    saveState = true
+                                                }
                                             }
                                             launchSingleTop = true
                                             restoreState = true
@@ -116,6 +123,9 @@ fun DocuNavGraph(
                             DocumentTool.EXCEL_TO_PDF -> navController.navigate(Screen.ExcelToPdf.route)
                             DocumentTool.WORD_TO_PDF -> navController.navigate(Screen.WordToPdf.route)
                             DocumentTool.POWERPOINT_TO_PDF -> navController.navigate(Screen.PowerPointToPdf.route)
+                            DocumentTool.PDF_TO_WORD -> navController.navigate(Screen.PdfToWord.route)
+                            DocumentTool.PDF_TO_EXCEL -> navController.navigate(Screen.PdfToExcel.route)
+                            DocumentTool.PDF_TO_POWERPOINT -> navController.navigate(Screen.PdfToPowerPoint.route)
                         }
                     },
                     onNavigateToHistory = {
@@ -168,6 +178,24 @@ fun DocuNavGraph(
 
             composable(Screen.PowerPointToPdf.route) {
                 PowerPointToPdfScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.PdfToWord.route) {
+                PdfToWordScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.PdfToExcel.route) {
+                PdfToExcelScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.PdfToPowerPoint.route) {
+                PdfToPowerPointScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

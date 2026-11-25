@@ -15,7 +15,7 @@ data class OfficeConversionOptions(
 )
 
 /**
- * Domain repository contract for Office document conversion (Excel, Word, PowerPoint to PDF).
+ * Domain repository contract for Office document conversion (Excel, Word, PowerPoint to PDF and PDF to Office).
  * Real conversions communicate with an isolated LibreOffice backend service or native rendering engine.
  */
 interface OfficeConversionRepository {
@@ -29,6 +29,19 @@ interface OfficeConversionRepository {
         backendBaseUrl: String,
         authToken: String? = null,
         options: OfficeConversionOptions = OfficeConversionOptions(),
+        onProgress: (Float) -> Unit = {}
+    ): AppResult<PlatformFile>
+
+    /**
+     * Converts a PDF document file to an Office document (.docx, .xlsx, .pptx).
+     * Communicates with LibreOffice backend service or falls back to native OpenXML extraction.
+     */
+    suspend fun convertPdfToOfficeDocument(
+        sourceFile: PlatformFile,
+        tool: DocumentTool,
+        backendBaseUrl: String,
+        authToken: String? = null,
+        outputFileName: String? = null,
         onProgress: (Float) -> Unit = {}
     ): AppResult<PlatformFile>
 

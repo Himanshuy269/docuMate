@@ -47,7 +47,7 @@ class IosPdfRepository : PdfRepository {
             for ((index, imgFile) in imageFiles.withIndex()) {
                 val uiImage = UIImage.imageWithContentsOfFile(imgFile.path)
                 if (uiImage != null) {
-                    val page = platform.PDFKit.PDFPage(image = uiImage)
+                    val page = platform.PDFKit.PDFPage(uiImage)
                     if (page != null) {
                         pdfDocument.insertPage(page, atIndex = pdfDocument.pageCount)
                     }
@@ -80,13 +80,13 @@ class IosPdfRepository : PdfRepository {
         try {
             onProgress(0.2f)
             val sourceUrl = NSURL.fileURLWithPath(existingPdfFile.path)
-            val pdfDoc = PDFDocument(uRL = sourceUrl) ?: return@withContext AppResult.Error("Unable to load source PDF")
+            val pdfDoc = PDFDocument(sourceUrl) ?: return@withContext AppResult.Error("Unable to load source PDF")
 
             var insertIdx = insertPositionPage.toLong().coerceIn(0L, pdfDoc.pageCount)
             for (img in imageFiles) {
                 val uiImg = UIImage.imageWithContentsOfFile(img.path)
                 if (uiImg != null) {
-                    val page = platform.PDFKit.PDFPage(image = uiImg)
+                    val page = platform.PDFKit.PDFPage(uiImg)
                     if (page != null) {
                         pdfDoc.insertPage(page, atIndex = insertIdx)
                         insertIdx++
@@ -124,7 +124,7 @@ class IosPdfRepository : PdfRepository {
         try {
             onProgress(0.3f)
             val sourceUrl = NSURL.fileURLWithPath(sourcePdfFile.path)
-            val pdfDoc = PDFDocument(uRL = sourceUrl) ?: return@withContext AppResult.Error("Unable to load PDF for compression")
+            val pdfDoc = PDFDocument(sourceUrl) ?: return@withContext AppResult.Error("Unable to load PDF for compression")
 
             val fileManager = NSFileManager.defaultManager
             val cacheUrls = fileManager.URLsForDirectory(NSCachesDirectory, NSUserDomainMask)
@@ -150,7 +150,7 @@ class IosPdfRepository : PdfRepository {
     override suspend fun getPdfPageCount(pdfFile: PlatformFile): AppResult<Int> = withContext(Dispatchers.Default) {
         try {
             val sourceUrl = NSURL.fileURLWithPath(pdfFile.path)
-            val pdfDoc = PDFDocument(uRL = sourceUrl)
+            val pdfDoc = PDFDocument(sourceUrl)
             AppResult.Success(pdfDoc?.pageCount?.toInt() ?: 0)
         } catch (e: Exception) {
             AppResult.Error("Failed to get page count: ${e.message}", e)

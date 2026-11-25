@@ -5,11 +5,12 @@ package com.example.documate.core.domain.model
  */
 enum class ToolCategory(val title: String) {
     PDF("PDF Tools"),
-    OFFICE("Office to PDF")
+    OFFICE("Office to PDF"),
+    PDF_TO_OFFICE("PDF to Office")
 }
 
 /**
- * The six core document utility tools supported by DocuKit/DocuMate.
+ * The core document utility tools supported by DocuKit/DocuMate.
  */
 enum class DocumentTool(
     val id: String,
@@ -66,6 +67,30 @@ enum class DocumentTool(
         category = ToolCategory.OFFICE,
         supportedExtensions = listOf("pptx", "ppt"),
         route = "powerpoint_to_pdf"
+    ),
+    PDF_TO_WORD(
+        id = "pdf_to_word",
+        title = "PDF to Word",
+        subtitle = "Convert .pdf documents to editable .docx files",
+        category = ToolCategory.PDF_TO_OFFICE,
+        supportedExtensions = listOf("pdf"),
+        route = "pdf_to_word"
+    ),
+    PDF_TO_EXCEL(
+        id = "pdf_to_excel",
+        title = "PDF to Excel",
+        subtitle = "Extract tables from .pdf into .xlsx spreadsheets",
+        category = ToolCategory.PDF_TO_OFFICE,
+        supportedExtensions = listOf("pdf"),
+        route = "pdf_to_excel"
+    ),
+    PDF_TO_POWERPOINT(
+        id = "pdf_to_powerpoint",
+        title = "PDF to PowerPoint",
+        subtitle = "Turn .pdf slides into editable .pptx presentations",
+        category = ToolCategory.PDF_TO_OFFICE,
+        supportedExtensions = listOf("pdf"),
+        route = "pdf_to_powerpoint"
     );
 
     companion object {

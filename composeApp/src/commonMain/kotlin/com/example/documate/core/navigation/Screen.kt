@@ -23,6 +23,9 @@ sealed class Screen(val route: String) {
     data object ExcelToPdf : Screen("excel_to_pdf")
     data object WordToPdf : Screen("word_to_pdf")
     data object PowerPointToPdf : Screen("powerpoint_to_pdf")
+    data object PdfToWord : Screen("pdf_to_word")
+    data object PdfToExcel : Screen("pdf_to_excel")
+    data object PdfToPowerPoint : Screen("pdf_to_powerpoint")
 
     data object Result : Screen("result/{recordId}") {
         fun createRoute(recordId: String) = "result/$recordId"

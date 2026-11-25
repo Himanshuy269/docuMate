@@ -249,6 +249,51 @@ fun HomeScreen(
                             )
                         }
                     }
+
+                    // Row 4: PDF to Word & PDF to Excel
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            ToolCardItem(
+                                title = "PDF to Word",
+                                subtitle = "Editable .docx format",
+                                icon = Icons.Outlined.Description,
+                                iconBgColor = Color(0xFFEFF6FF),
+                                iconTint = Color(0xFF2563EB),
+                                onClick = { onNavigateToTool(DocumentTool.PDF_TO_WORD) }
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            ToolCardItem(
+                                title = "PDF to Excel",
+                                subtitle = "Extract sheet tables",
+                                icon = Icons.Outlined.TableChart,
+                                iconBgColor = Color(0xFFECFDF5),
+                                iconTint = Color(0xFF059669),
+                                onClick = { onNavigateToTool(DocumentTool.PDF_TO_EXCEL) }
+                            )
+                        }
+                    }
+
+                    // Row 5: PDF to PowerPoint
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            ToolCardItem(
+                                title = "PDF to PowerPoint",
+                                subtitle = "Convert to .pptx slides",
+                                icon = Icons.Outlined.Slideshow,
+                                iconBgColor = Color(0xFFFFF1F2),
+                                iconTint = Color(0xFFE11D48),
+                                onClick = { onNavigateToTool(DocumentTool.PDF_TO_POWERPOINT) }
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
 

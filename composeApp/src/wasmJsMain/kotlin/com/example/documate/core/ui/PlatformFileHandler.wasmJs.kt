@@ -67,7 +67,7 @@ actual fun rememberPlatformFilePicker(
                                     id = "web_file_${name}_$i",
                                     name = name,
                                     uriString = name,
-                                    sizeBytes = file.size.toLong(),
+                                    sizeBytes = file.size.toDouble().toLong(),
                                     mimeType = file.type,
                                     extension = ext
                                 )

@@ -46,6 +46,9 @@ fun DocuToolCard(
         DocumentTool.EXCEL_TO_PDF -> Icons.Default.TableChart to DocuExcelGreen
         DocumentTool.WORD_TO_PDF -> Icons.Default.Description to DocuWordBlue
         DocumentTool.POWERPOINT_TO_PDF -> Icons.Default.PresentToAll to DocuPowerPointOrange
+        DocumentTool.PDF_TO_WORD -> Icons.Default.Description to DocuWordBlue
+        DocumentTool.PDF_TO_EXCEL -> Icons.Default.TableChart to DocuExcelGreen
+        DocumentTool.PDF_TO_POWERPOINT -> Icons.Default.PresentToAll to DocuPowerPointOrange
     }
 
     DocuCard(

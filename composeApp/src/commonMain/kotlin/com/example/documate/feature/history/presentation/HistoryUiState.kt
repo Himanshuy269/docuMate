@@ -35,7 +35,7 @@ data class HistoryUiState(
             val matchesTab = when (selectedTab) {
                 HistoryFilterTab.ALL -> true
                 HistoryFilterTab.IMAGES -> record.tool == DocumentTool.IMAGES_TO_PDF || record.tool == DocumentTool.ADD_IMAGES_TO_PDF
-                HistoryFilterTab.DOCUMENTS -> record.tool.category == ToolCategory.OFFICE
+                HistoryFilterTab.DOCUMENTS -> record.tool.category == ToolCategory.OFFICE || record.tool.category == ToolCategory.PDF_TO_OFFICE
                 HistoryFilterTab.COMPRESSED -> record.tool == DocumentTool.PDF_COMPRESSION
             }
 
